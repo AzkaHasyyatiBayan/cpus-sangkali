@@ -6,9 +6,10 @@ import { eq } from "drizzle-orm";
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const activityId = parseInt(params.id);
+  const { id } = await params;
+  const activityId = parseInt(id);
   if (isNaN(activityId)) {
     return NextResponse.json({ error: "ID tidak valid" }, { status: 400 });
   }
