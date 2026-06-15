@@ -10,7 +10,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "CPUS Sangkali - Galeri Foto Kegiatan",
   description:
-    "Sistem galeri foto digital untuk mendokumentasikan kegiatan CPUS Sangkali. Unggah, kelola, dan lihat foto kegiatan dengan mudah.",
+    "Sistem galeri foto digital untuk mendokumentasikan kegiatan yang dilakukan Puskesmas Sangkali. Unggah, kelola, dan lihat foto kegiatan dengan mudah.",
   keywords: ["galeri", "foto", "kegiatan", "cpus", "sangkali", "dokumentasi"],
   authors: [{ name: "CPUS Sangkali" }],
   openGraph: {

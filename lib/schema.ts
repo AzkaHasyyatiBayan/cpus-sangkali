@@ -1,17 +1,21 @@
-import { pgTable, serial, text, timestamp, varchar, date } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, varchar, date, integer, bigint } from "drizzle-orm/pg-core";
 
 export const activities = pgTable("activities", {
   id: serial("id").primaryKey(),
   title: varchar("title", { length: 255 }).notNull(),
-  activityDate: date("activity_date").notNull(),
+  description: text("description"),
+  location: text("location"),                
+  uploader: text("uploader"),                
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const photos = pgTable("photos", {
   id: serial("id").primaryKey(),
-  activityId: serial("activity_id").references(() => activities.id),
+  activityId: integer("activity_id").references(() => activities.id, { onDelete: "cascade" }).notNull(),
+  activityDate: date("activity_date").notNull(),
   driveFileId: text("drive_file_id").notNull(),
   fileName: text("file_name"),
   mimeType: varchar("mime_type", { length: 100 }),
+  size: bigint("size", { mode: "number" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

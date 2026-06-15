@@ -5,25 +5,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Camera, FolderOpen, RefreshCw, HardDrive, AlertTriangle } from "lucide-react";
 import CameraUploader from "@/app/components/CameraUploader";
 import ActivityFilter from "@/app/components/ActivityFilter";
-import PhotoStack from "@/app/components/PhotoStack";
+import PhotoStack, { type Activity } from "@/app/components/PhotoStack";
 import { Button } from "@/app/components/ui/button";
 import { formatBytes } from "@/lib/utils";
-
-interface Photo {
-  id: number;
-  driveFileId: string;
-  fileName: string;
-  mimeType: string;
-  thumbnailUrl: string;
-  fullUrl: string;
-}
-
-interface Activity {
-  id: number;
-  title: string;
-  activityDate: string;
-  photos: Photo[];
-}
 
 interface StorageInfo {
   used: number;
@@ -34,8 +18,13 @@ interface StorageInfo {
 export default function GalleryPage() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterTitle, setFilterTitle] = useState("");
-  const [filterDate, setFilterDate] = useState("");
+  // Sekarang filter memiliki 4 field
+  const [filters, setFilters] = useState({
+    title: "",
+    date: "",
+    location: "",
+    uploader: "",
+  });
   const [refreshing, setRefreshing] = useState(false);
   const [storage, setStorage] = useState<StorageInfo | null>(null);
 
@@ -43,14 +32,18 @@ export default function GalleryPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (filterTitle) params.set("title", filterTitle);
-      if (filterDate) params.set("date", filterDate);
+      if (filters.title) params.set("title", filters.title);
+      if (filters.date) params.set("date", filters.date);
+      if (filters.location) params.set("location", filters.location);
+      if (filters.uploader) params.set("uploader", filters.uploader);
 
       const res = await fetch(`/api/activities?${params.toString()}`);
       const data = await res.json();
-
       if (data.success) {
-        setActivities(data.data);
+        const filtered = data.data.filter((activity: Activity) =>
+          activity.dates.some((d) => d.photos.length > 0)
+        );
+        setActivities(filtered);
       }
     } catch (error) {
       console.error("Failed to fetch activities:", error);
@@ -58,15 +51,13 @@ export default function GalleryPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [filterTitle, filterDate]);
+  }, [filters]);
 
   const fetchStorage = useCallback(async () => {
     try {
-      const res = await fetch("/api/cloudinary/usage");
+      const res = await fetch("/api/storage/usage");
       const data = await res.json();
-      if (data.success) {
-        setStorage(data.data);
-      }
+      if (data.success) setStorage(data.data);
     } catch (error) {
       console.error("Gagal fetch storage:", error);
     }
@@ -80,10 +71,10 @@ export default function GalleryPage() {
     load();
   }, [fetchActivities, fetchStorage]);
 
+  // Handler baru yang menerima 4 parameter
   const handleFilterChange = useCallback(
-    (title: string, date: string) => {
-      setFilterTitle(title);
-      setFilterDate(date);
+    (title: string, date: string, location: string, uploader: string) => {
+      setFilters({ title, date, location, uploader });
     },
     []
   );
@@ -100,11 +91,10 @@ export default function GalleryPage() {
     fetchStorage();
   }, [fetchActivities, fetchStorage]);
 
-  const handleDeleteActivity = useCallback((activityId: number) => {
-    setActivities((prev) => prev.filter((a) => a.id !== activityId));
-    fetchStorage();
-  }, [fetchStorage]);
-
+  const totalPhotos = activities.reduce(
+    (sum, a) => sum + a.dates.reduce((s, d) => s + d.photos.length, 0),
+    0
+  );
   const isNearLimit = storage && storage.percent > 90;
   const recommendedDeleteBytes = storage ? storage.used - storage.limit * 0.75 : 0;
 
@@ -117,29 +107,20 @@ export default function GalleryPage() {
               <Camera className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-emerald-800 leading-tight">
-                CPUS Sangkali
-              </h1>
+              <h1 className="text-lg font-bold text-emerald-800 leading-tight">CPUS Sangkali</h1>
               <p className="text-xs text-slate-500">Galeri Foto Kegiatan</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             {storage && (
-              <div className="hidden sm:flex items-center text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
+              <div className="flex items-center text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
                 <HardDrive className="h-3 w-3 mr-1" />
-                {formatBytes(storage.used)} / {formatBytes(storage.limit)}
-                {storage.percent > 80 && (
-                  <span className="ml-1 text-amber-500">({storage.percent.toFixed(1)}%)</span>
-                )}
+                <span className="hidden sm:inline">{formatBytes(storage.used)} / {formatBytes(storage.limit)}</span>
+                <span className="sm:hidden">{storage.percent.toFixed(1)}%</span>
+                {storage.percent > 80 && <span className="ml-1 text-amber-500">({storage.percent.toFixed(1)}%)</span>}
               </div>
             )}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="text-emerald-600 hover:bg-emerald-50"
-            >
+            <Button variant="ghost" size="icon" onClick={handleRefresh} disabled={refreshing} className="text-emerald-600 hover:bg-emerald-50">
               <RefreshCw className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} />
             </Button>
           </div>
@@ -147,10 +128,7 @@ export default function GalleryPage() {
         {isNearLimit && (
           <div className="bg-red-50 border-t border-red-200 px-4 py-2 text-sm text-red-700 flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-red-500" />
-            <span>
-              Penyimpanan hampir penuh ({storage!.percent.toFixed(1)}%). Disarankan menghapus sekitar{" "}
-              <strong>{formatBytes(recommendedDeleteBytes)}</strong> foto. Gunakan fitur hapus kegiatan atau pilih foto yang tidak diperlukan.
-            </span>
+            <span>Penyimpanan hampir penuh ({storage!.percent.toFixed(1)}%). Disarankan menghapus sekitar <strong>{formatBytes(recommendedDeleteBytes)}</strong> foto.</span>
           </div>
         )}
       </header>
@@ -159,21 +137,9 @@ export default function GalleryPage() {
         <ActivityFilter onFilterChange={handleFilterChange} />
 
         {!loading && activities.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center justify-between text-sm text-slate-500"
-          >
-            <span>
-              Menampilkan <strong className="text-emerald-700">{activities.length}</strong> kegiatan
-            </span>
-            <span>
-              Total{" "}
-              <strong className="text-emerald-700">
-                {activities.reduce((sum, a) => sum + a.photos.length, 0)}
-              </strong>{" "}
-              foto
-            </span>
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between text-sm text-slate-500">
+            <span>Menampilkan <strong className="text-emerald-700">{activities.length}</strong> kegiatan</span>
+            <span>Total <strong className="text-emerald-700">{totalPhotos}</strong> foto</span>
           </motion.div>
         )}
 
@@ -186,9 +152,7 @@ export default function GalleryPage() {
                   <div className="h-4 w-24 bg-emerald-50 rounded" />
                 </div>
                 <div className="flex gap-3">
-                  {[1, 2, 3, 4, 5].map((j) => (
-                    <div key={j} className="w-32 h-32 bg-emerald-50 rounded-xl skeleton" />
-                  ))}
+                  {[1, 2, 3, 4, 5].map((j) => (<div key={j} className="w-32 h-32 bg-emerald-50 rounded-xl skeleton" />))}
                 </div>
               </div>
             ))}
@@ -196,21 +160,15 @@ export default function GalleryPage() {
         )}
 
         {!loading && activities.length === 0 && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="flex flex-col items-center justify-center py-16 text-center"
-          >
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center justify-center py-16 text-center">
             <div className="h-20 w-20 rounded-full bg-emerald-50 flex items-center justify-center mb-4">
               <FolderOpen className="h-10 w-10 text-emerald-300" />
             </div>
-            <h3 className="text-lg font-semibold text-emerald-800 mb-1">
-              Belum Ada Kegiatan
-            </h3>
+            <h3 className="text-lg font-semibold text-emerald-800 mb-1">Belum Ada Kegiatan</h3>
             <p className="text-slate-500 text-sm max-w-xs">
-              {filterTitle || filterDate
-                ? "Tidak ada kegiatan yang cocok dengan filter Anda. Coba ubah filter atau reset."
-                : "Mulai dengan mengunggah foto kegiatan pertama Anda. Ketuk tombol kamera di pojok kanan bawah."}
+              {filters.title || filters.date || filters.location || filters.uploader
+                ? "Tidak ada kegiatan yang cocok dengan filter Anda."
+                : "Mulai dengan mengunggah foto kegiatan pertama Anda."}
             </p>
           </motion.div>
         )}
@@ -218,11 +176,12 @@ export default function GalleryPage() {
         {!loading && (
           <div className="space-y-4">
             <AnimatePresence mode="popLayout">
-              {activities.map((activity) => (
+              {activities.map((activity, index) => (
                 <PhotoStack
                   key={activity.id}
                   activity={activity}
-                  onDelete={handleDeleteActivity}
+                  onRefresh={handleRefresh}
+                  isFirstActivity={index === 0}
                 />
               ))}
             </AnimatePresence>

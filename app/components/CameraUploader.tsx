@@ -1,12 +1,118 @@
 "use client";
 
-import React, { useState, useRef } from "react";
-import { Camera, Upload, X, Loader2, CheckCircle } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import {
+  Camera, Upload, X, Loader2, CheckCircle, Image as ImageIcon,
+  Info, MapPin, User, Search
+} from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import Compressor from "compressorjs";
+import { MAX_DESCRIPTION_WORDS } from "@/lib/constants";
+
+// Komponen dropdown dengan suggestion
+function SuggestionInput({
+  value,
+  onChange,
+  suggestions,
+  disabled,
+  placeholder,
+  icon,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  suggestions: string[];
+  disabled?: boolean;
+  placeholder?: string;
+  icon?: React.ReactNode;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const filtered = suggestions.filter((s) =>
+    s.toLowerCase().includes(value.toLowerCase())
+  );
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="relative">
+        {icon && (
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+            {icon}
+          </span>
+        )}
+        <Input
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setIsOpen(true);
+          }}
+          onFocus={() => setIsOpen(true)}
+          placeholder={placeholder || "Ketik atau pilih..."}
+          disabled={disabled}
+          className={`border-emerald-200 focus:border-emerald-500 ${icon ? "pl-9 pr-10" : "pr-10"}`}
+        />
+      </div>
+      {value && (
+        <button
+          type="button"
+          onClick={() => {
+            onChange("");
+            setIsOpen(true);
+          }}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+          disabled={disabled}
+        >
+          <X className="h-4 w-4" />
+        </button>
+      )}
+
+      <AnimatePresence>
+        {isOpen && filtered.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -5 }}
+            transition={{ duration: 0.15 }}
+            className="absolute top-full mt-1 w-full bg-white border border-emerald-200 rounded-lg shadow-lg z-20 max-h-60 overflow-y-auto"
+          >
+            {value.trim() &&
+              !suggestions.some((s) => s.toLowerCase() === value.toLowerCase()) && (
+                <div className="px-3 py-2 bg-emerald-50 text-emerald-700 text-sm border-b border-emerald-100 flex items-center gap-2">
+                  <Info className="h-3.5 w-3.5" />
+                  <span>Gunakan baru: <strong>&quot;{value}&quot;</strong></span>
+                </div>
+              )}
+            {filtered.map((s) => (
+              <div
+                key={s}
+                onClick={() => {
+                  onChange(s);
+                  setIsOpen(false);
+                }}
+                className="px-3 py-2 hover:bg-emerald-50 cursor-pointer text-sm border-b border-emerald-50 last:border-0"
+              >
+                {s}
+              </div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 interface CameraUploaderProps {
   onUploadSuccess: () => void;
@@ -16,24 +122,55 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
   const [isOpen, setIsOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [description, setDescription] = useState("");
+  const [location, setLocation] = useState("");
+  const [uploader, setUploader] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadSuccess, setUploadSuccess] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [titleSuggestions, setTitleSuggestions] = useState<string[]>([]);
+  const [locationSuggestions, setLocationSuggestions] = useState<string[]>([]);
+  const [uploaderSuggestions, setUploaderSuggestions] = useState<string[]>([]);
+
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+
+  const wordCount = description.trim() ? description.trim().split(/\s+/).filter(Boolean).length : 0;
+  const isOverLimit = wordCount > MAX_DESCRIPTION_WORDS;
+
+  // Ambil saran saat modal terbuka
+  useEffect(() => {
+    if (isOpen) {
+      fetch("/api/activities/titles")
+        .then((r) => r.json())
+        .then((d) => { if (d.success) setTitleSuggestions(d.data); })
+        .catch(console.error);
+
+      fetch("/api/activities/locations")
+        .then((r) => r.json())
+        .then((d) => { if (d.success) setLocationSuggestions(d.data); })
+        .catch(console.error);
+
+      fetch("/api/activities/uploaders")
+        .then((r) => r.json())
+        .then((d) => { if (d.success) setUploaderSuggestions(d.data); })
+        .catch(console.error);
+    }
+  }, [isOpen]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
+    if (!selectedFiles.length) return;
     setFiles((prev) => [...prev, ...selectedFiles]);
-
     selectedFiles.forEach((file) => {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviews((prev) => [...prev, reader.result as string]);
-      };
+      reader.onloadend = () => setPreviews((prev) => [...prev, reader.result as string]);
       reader.readAsDataURL(file);
     });
+    e.target.value = "";
   };
 
   const removeFile = (index: number) => {
@@ -46,25 +183,24 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
       alert("Mohon isi judul, tanggal, dan pilih minimal satu foto.");
       return;
     }
+    if (isOverLimit) {
+      alert(`Deskripsi maksimal ${MAX_DESCRIPTION_WORDS} kata (saat ini: ${wordCount}).`);
+      return;
+    }
 
     setIsUploading(true);
     setUploadProgress(0);
 
     try {
       for (let i = 0; i < files.length; i++) {
-        // Kompres file sebelum upload
         const compressedFile = await new Promise<File>((resolve, reject) => {
           new Compressor(files[i], {
             maxWidth: 1920,
             maxHeight: 1920,
             quality: 0.8,
             mimeType: "image/webp",
-            success(result) {
-              resolve(result as File);
-            },
-            error(err) {
-              reject(err);
-            },
+            success(result) { resolve(result as File); },
+            error(err) { reject(err); },
           });
         });
 
@@ -72,6 +208,9 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
         formData.append("file", compressedFile);
         formData.append("title", title.trim());
         formData.append("date", date);
+        formData.append("description", description.trim());
+        formData.append("location", location.trim());
+        formData.append("uploader", uploader.trim());
 
         const response = await fetch("/api/upload", {
           method: "POST",
@@ -92,8 +231,7 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
         onUploadSuccess();
       }, 1500);
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Terjadi kesalahan";
+      const message = error instanceof Error ? error.message : "Terjadi kesalahan";
       alert(`Error: ${message}`);
     } finally {
       setIsUploading(false);
@@ -104,6 +242,9 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
     setIsOpen(false);
     setTitle("");
     setDate(new Date().toISOString().split("T")[0]);
+    setDescription("");
+    setLocation("");
+    setUploader("");
     setFiles([]);
     setPreviews([]);
     setUploadProgress(0);
@@ -128,24 +269,21 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-            onClick={(e) => e.target === e.currentTarget && resetForm()}
+            onClick={(e) => e.target === e.currentTarget && !isUploading && resetForm()}
           >
             <motion.div
               initial={{ y: 100, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 100, opacity: 0 }}
               transition={{ type: "spring", damping: 25 }}
-              className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden"
+              className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
             >
-              <div className="bg-linear-to-r from-emerald-600 to-emerald-700 px-6 py-4 flex items-center justify-between">
+              <div className="bg-linear-to-r from-emerald-600 to-emerald-700 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
                 <h2 className="text-white font-semibold text-lg">
                   {uploadSuccess ? "Berhasil!" : "Unggah Foto"}
                 </h2>
                 {!isUploading && !uploadSuccess && (
-                  <button
-                    onClick={resetForm}
-                    className="text-white/80 hover:text-white transition-colors"
-                  >
+                  <button onClick={resetForm} className="text-white/80 hover:text-white transition-colors">
                     <X className="h-5 w-5" />
                   </button>
                 )}
@@ -153,37 +291,33 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
 
               <div className="p-6 space-y-4">
                 {uploadSuccess ? (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="flex flex-col items-center py-8"
-                  >
+                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="flex flex-col items-center py-8">
                     <CheckCircle className="h-16 w-16 text-emerald-500 mb-4" />
-                    <p className="text-emerald-800 font-medium text-lg">
-                      Foto berhasil diunggah!
-                    </p>
-                    <p className="text-slate-500 text-sm mt-1">
-                      {files.length} foto tersimpan
-                    </p>
+                    <p className="text-emerald-800 font-medium text-lg">Foto berhasil diunggah!</p>
+                    <p className="text-slate-500 text-sm mt-1">{files.length} foto tersimpan</p>
                   </motion.div>
                 ) : (
                   <>
+                    {/* Judul */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                        Judul Kegiatan
+                        Judul Kegiatan <span className="text-red-500">*</span>
                       </label>
-                      <Input
+                      <SuggestionInput
                         value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        placeholder="Contoh: Rapat Koordinasi, Kerja Bakti..."
-                        className="border-emerald-200 focus:border-emerald-500"
+                        onChange={setTitle}
+                        suggestions={titleSuggestions}
                         disabled={isUploading}
+                        placeholder="Ketik atau pilih kegiatan..."
+                        icon={<Search className="h-4 w-4" />}
                       />
+                      <p className="text-xs text-slate-400 mt-1">Pilih dari daftar atau ketik nama baru</p>
                     </div>
 
+                    {/* Tanggal */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                        Tanggal Kegiatan
+                        Tanggal Kegiatan <span className="text-red-500">*</span>
                       </label>
                       <Input
                         type="date"
@@ -194,98 +328,139 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
                       />
                     </div>
 
+                    {/* Lokasi */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                        Pilih Foto
+                        Lokasi Kegiatan <span className="text-slate-400 font-normal">(opsional)</span>
                       </label>
-                      <div
-                        onClick={() => !isUploading && fileInputRef.current?.click()}
-                        className="border-2 border-dashed border-emerald-200 rounded-xl p-6 text-center cursor-pointer hover:border-emerald-400 hover:bg-emerald-50/50 transition-all"
-                      >
-                        <Upload className="h-8 w-8 text-emerald-400 mx-auto mb-2" />
-                        <p className="text-sm text-slate-600">
-                          Ketuk untuk pilih foto atau ambil dari kamera
-                        </p>
-                        <p className="text-xs text-slate-400 mt-1">
-                          JPG, PNG, WEBP (Maks 10MB per foto)
-                        </p>
-                      </div>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        capture="environment"
-                        onChange={handleFileChange}
-                        className="hidden"
+                      <SuggestionInput
+                        value={location}
+                        onChange={setLocation}
+                        suggestions={locationSuggestions}
                         disabled={isUploading}
+                        placeholder="Ketik atau pilih lokasi..."
+                        icon={<MapPin className="h-4 w-4" />}
                       />
                     </div>
 
+                    {/* Pengupload */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        Diupload oleh <span className="text-slate-400 font-normal">(opsional)</span>
+                      </label>
+                      <SuggestionInput
+                        value={uploader}
+                        onChange={setUploader}
+                        suggestions={uploaderSuggestions}
+                        disabled={isUploading}
+                        placeholder="Ketik atau pilih pengupload..."
+                        icon={<User className="h-4 w-4" />}
+                      />
+                    </div>
+
+                    {/* Deskripsi */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        Deskripsi Singkat <span className="text-slate-400 font-normal">(opsional)</span>
+                      </label>
+                      <textarea
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="Ceritakan singkat tentang kegiatan ini..."
+                        disabled={isUploading}
+                        rows={3}
+                        className="flex w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors resize-none"
+                      />
+                      <div className="flex justify-between items-center mt-1">
+                        <p className="text-xs text-slate-400">Ditampilkan di atas foto</p>
+                        <p className={`text-xs font-medium ${isOverLimit ? "text-red-500" : wordCount > MAX_DESCRIPTION_WORDS * 0.9 ? "text-amber-500" : "text-slate-400"}`}>
+                          {wordCount}/{MAX_DESCRIPTION_WORDS} kata
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Pilih Foto */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        Pilih Foto <span className="text-red-500">*</span>
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          type="button"
+                          onClick={() => cameraInputRef.current?.click()}
+                          disabled={isUploading}
+                          variant="outline"
+                          className="h-20 flex-col gap-1 border-emerald-200 hover:bg-emerald-50 hover:border-emerald-400"
+                        >
+                          <Camera className="h-5 w-5 text-emerald-600" />
+                          <span className="text-xs font-medium">Ambil Foto</span>
+                          <span className="text-[10px] text-slate-400">Dari kamera</span>
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => galleryInputRef.current?.click()}
+                          disabled={isUploading}
+                          variant="outline"
+                          className="h-20 flex-col gap-1 border-emerald-200 hover:bg-emerald-50 hover:border-emerald-400"
+                        >
+                          <ImageIcon className="h-5 w-5 text-emerald-600" />
+                          <span className="text-xs font-medium">Pilih dari Galeri</span>
+                          <span className="text-[10px] text-slate-400">Foto yang sudah ada</span>
+                        </Button>
+                      </div>
+                      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileChange} className="hidden" disabled={isUploading} />
+                      <input ref={galleryInputRef} type="file" accept="image/*" multiple onChange={handleFileChange} className="hidden" disabled={isUploading} />
+                      <p className="text-xs text-slate-400 mt-2 text-center">JPG, PNG, WEBP • Maks 10MB per foto</p>
+                    </div>
+
+                    {/* Preview */}
                     {previews.length > 0 && (
-                      <div className="grid grid-cols-4 gap-2">
-                        {previews.map((preview, index) => (
-                          <motion.div
-                            key={index}
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="relative aspect-square rounded-lg overflow-hidden border border-emerald-100"
-                          >
-                            <Image
-                              src={preview}
-                              alt={`Preview ${index + 1}`}
-                              fill
-                              sizes="96px"
-                              className="object-cover"
-                              unoptimized
-                            />
-                            {!isUploading && (
-                              <button
-                                onClick={() => removeFile(index)}
-                                className="absolute top-1 right-1 h-5 w-5 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            )}
-                          </motion.div>
-                        ))}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-slate-700">{previews.length} foto dipilih</span>
+                          {!isUploading && (
+                            <button onClick={() => { setFiles([]); setPreviews([]); }} className="text-xs text-red-500 hover:text-red-600">
+                              Hapus semua
+                            </button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-4 gap-2">
+                          {previews.map((preview, index) => (
+                            <motion.div key={index} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="relative aspect-square rounded-lg overflow-hidden border border-emerald-100">
+                              <Image src={preview} alt={`Preview ${index + 1}`} fill sizes="96px" className="object-cover" unoptimized />
+                              {!isUploading && (
+                                <button onClick={() => removeFile(index)} className="absolute top-1 right-1 h-5 w-5 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors">
+                                  <X className="h-3 w-3" />
+                                </button>
+                              )}
+                            </motion.div>
+                          ))}
+                        </div>
                       </div>
                     )}
 
+                    {/* Progress */}
                     {isUploading && (
                       <div className="space-y-2">
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-slate-600">Mengunggah...</span>
-                          <span className="text-emerald-700 font-medium">
-                            {uploadProgress}%
-                          </span>
+                          <span className="text-emerald-700 font-medium">{uploadProgress}%</span>
                         </div>
                         <div className="h-2 bg-emerald-100 rounded-full overflow-hidden">
-                          <motion.div
-                            className="h-full bg-emerald-500 rounded-full"
-                            initial={{ width: 0 }}
-                            animate={{ width: `${uploadProgress}%` }}
-                            transition={{ duration: 0.3 }}
-                          />
+                          <motion.div className="h-full bg-emerald-500 rounded-full" initial={{ width: 0 }} animate={{ width: `${uploadProgress}%` }} transition={{ duration: 0.3 }} />
                         </div>
                       </div>
                     )}
 
                     <Button
                       onClick={handleUpload}
-                      disabled={isUploading || files.length === 0 || !title.trim()}
+                      disabled={isUploading || files.length === 0 || !title.trim() || isOverLimit}
                       className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-12 text-base font-medium"
                     >
                       {isUploading ? (
-                        <>
-                          <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                          Mengunggah...
-                        </>
+                        <><Loader2 className="h-5 w-5 mr-2 animate-spin" /> Mengunggah...</>
                       ) : (
-                        <>
-                          <Upload className="h-5 w-5 mr-2" />
-                          Unggah {files.length > 0 ? `${files.length} Foto` : "Foto"}
-                        </>
+                        <><Upload className="h-5 w-5 mr-2" /> Unggah {files.length > 0 ? `${files.length} Foto` : "Foto"}</>
                       )}
                     </Button>
                   </>
