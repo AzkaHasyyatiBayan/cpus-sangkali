@@ -8,8 +8,8 @@ import { Button } from "@/app/components/ui/button";
 import { Badge } from "@/app/components/ui/badge";
 import { Calendar } from "@/app/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/app/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/app/components/ui/command";
 import { cn } from "@/lib/utils";
+import SuggestionInput from "@/app/components/SuggestionInput";
 
 interface ActivityFilterProps {
   onFilterChange: (title: string, date: string, location: string, uploader: string) => void;
@@ -25,9 +25,6 @@ export default function ActivityFilter({ onFilterChange }: ActivityFilterProps) 
   const [availableLocations, setAvailableLocations] = useState<string[]>([]);
   const [availableUploaders, setAvailableUploaders] = useState<string[]>([]);
 
-  const [openTitle, setOpenTitle] = useState(false);
-  const [openLocation, setOpenLocation] = useState(false);
-  const [openUploader, setOpenUploader] = useState(false);
   const [openCalendar, setOpenCalendar] = useState(false);
 
   useEffect(() => {
@@ -76,82 +73,30 @@ export default function ActivityFilter({ onFilterChange }: ActivityFilterProps) 
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {/* Title */}
-        <div>
-          <Popover open={openTitle} onOpenChange={setOpenTitle}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" role="combobox" className="w-full justify-between text-left font-normal border-emerald-200 hover:bg-emerald-50">
-                <Search className="h-4 w-4 text-slate-400 shrink-0 mr-2" />
-                {title || <span className="text-slate-400">Cari judul...</span>}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-62.5 p-0" align="start">
-              <Command>
-                <CommandInput placeholder="Ketik judul..." value={title} onValueChange={setTitle} />
-                <CommandList>
-                  <CommandEmpty>Tidak ada judul ditemukan.</CommandEmpty>
-                  <CommandGroup>
-                    {availableTitles.filter((t) => t.toLowerCase().includes(title.toLowerCase())).map((t) => (
-                      <CommandItem key={t} value={t} onSelect={() => { setTitle(t); setOpenTitle(false); }}>{t}</CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-        </div>
+        <SuggestionInput
+          value={title}
+          onChange={setTitle}
+          suggestions={availableTitles}
+          placeholder="Cari judul..."
+          icon={<Search className="h-4 w-4" />}
+        />
 
-        {/* Location */}
-        <div>
-          <Popover open={openLocation} onOpenChange={setOpenLocation}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" role="combobox" className="w-full justify-between text-left font-normal border-emerald-200 hover:bg-emerald-50">
-                <MapPin className="h-4 w-4 text-slate-400 shrink-0 mr-2" />
-                {location || <span className="text-slate-400">Lokasi...</span>}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-62.5 p-0" align="start">
-              <Command>
-                <CommandInput placeholder="Ketik lokasi..." value={location} onValueChange={setLocation} />
-                <CommandList>
-                  <CommandEmpty>Tidak ada lokasi ditemukan.</CommandEmpty>
-                  <CommandGroup>
-                    {availableLocations.filter((l) => l.toLowerCase().includes(location.toLowerCase())).map((l) => (
-                      <CommandItem key={l} value={l} onSelect={() => { setLocation(l); setOpenLocation(false); }}>{l}</CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-        </div>
+        <SuggestionInput
+          value={location}
+          onChange={setLocation}
+          suggestions={availableLocations}
+          placeholder="Lokasi..."
+          icon={<MapPin className="h-4 w-4" />}
+        />
 
-        {/* Uploader */}
-        <div>
-          <Popover open={openUploader} onOpenChange={setOpenUploader}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" role="combobox" className="w-full justify-between text-left font-normal border-emerald-200 hover:bg-emerald-50">
-                <User className="h-4 w-4 text-slate-400 shrink-0 mr-2" />
-                {uploader || <span className="text-slate-400">Pengupload...</span>}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-62.5 p-0" align="start">
-              <Command>
-                <CommandInput placeholder="Ketik pengupload..." value={uploader} onValueChange={setUploader} />
-                <CommandList>
-                  <CommandEmpty>Tidak ada pengupload ditemukan.</CommandEmpty>
-                  <CommandGroup>
-                    {availableUploaders.filter((u) => u.toLowerCase().includes(uploader.toLowerCase())).map((u) => (
-                      <CommandItem key={u} value={u} onSelect={() => { setUploader(u); setOpenUploader(false); }}>{u}</CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-        </div>
+        <SuggestionInput
+          value={uploader}
+          onChange={setUploader}
+          suggestions={availableUploaders}
+          placeholder="Pengupload..."
+          icon={<User className="h-4 w-4" />}
+        />
 
-        {/* Date */}
         <div>
           <Popover open={openCalendar} onOpenChange={setOpenCalendar}>
             <PopoverTrigger asChild>

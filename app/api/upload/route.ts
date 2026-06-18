@@ -65,6 +65,8 @@ export async function POST(request: NextRequest) {
         })
         .returning();
     } else {
+      // location/uploader di level activity ini cuma fallback agregat (legacy),
+      // sumber kebenaran utama sekarang ada di tabel photos per batch upload
       const changed: Record<string, string> = {};
       if (description?.trim() && !activity.description) changed.description = description.trim();
       if (location?.trim() && !activity.location) changed.location = location.trim();
@@ -87,6 +89,8 @@ export async function POST(request: NextRequest) {
         fileName: file.name,
         mimeType: file.type,
         size: fileSize,
+        location: location?.trim() || null,  
+        uploader: uploader?.trim() || null,  
       })
       .returning();
 

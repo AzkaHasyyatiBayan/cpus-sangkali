@@ -1,19 +1,27 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { activities } from "@/lib/schema";
+import { activities, photos } from "@/lib/schema";
 import { DEFAULT_LOCATIONS } from "@/lib/constants";
 import { sql } from "drizzle-orm";
 
 export async function GET() {
   try {
-    const dbLocations = await db
+    const photoLocations = await db
+      .select({ location: photos.location })
+      .from(photos)
+      .where(sql`${photos.location} IS NOT NULL`)
+      .groupBy(photos.location);
+
+    const activityLocations = await db
       .select({ location: activities.location })
       .from(activities)
       .where(sql`${activities.location} IS NOT NULL`)
-      .groupBy(activities.location)
-      .orderBy(activities.location);
+      .groupBy(activities.location);
 
-    const dbStrings = dbLocations.map((l) => l.location!).filter(Boolean);
+    const dbStrings = [...photoLocations, ...activityLocations]
+      .map((l) => l.location!)
+      .filter(Boolean);
+
     const seen = new Set<string>();
     const unique: string[] = [];
     [...dbStrings, ...DEFAULT_LOCATIONS].forEach((loc) => {

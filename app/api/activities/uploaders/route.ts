@@ -1,19 +1,27 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { activities } from "@/lib/schema";
+import { activities, photos } from "@/lib/schema";
 import { DEFAULT_UPLOADERS } from "@/lib/constants";
 import { sql } from "drizzle-orm";
 
 export async function GET() {
   try {
-    const dbUploaders = await db
+    const photoUploaders = await db
+      .select({ uploader: photos.uploader })
+      .from(photos)
+      .where(sql`${photos.uploader} IS NOT NULL`)
+      .groupBy(photos.uploader);
+
+    const activityUploaders = await db
       .select({ uploader: activities.uploader })
       .from(activities)
       .where(sql`${activities.uploader} IS NOT NULL`)
-      .groupBy(activities.uploader)
-      .orderBy(activities.uploader);
+      .groupBy(activities.uploader);
 
-    const dbStrings = dbUploaders.map((u) => u.uploader!).filter(Boolean);
+    const dbStrings = [...photoUploaders, ...activityUploaders]
+      .map((u) => u.uploader!)
+      .filter(Boolean);
+
     const seen = new Set<string>();
     const unique: string[] = [];
     [...dbStrings, ...DEFAULT_UPLOADERS].forEach((u) => {

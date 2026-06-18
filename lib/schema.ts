@@ -17,5 +17,7 @@ export const photos = pgTable("photos", {
   fileName: text("file_name"),
   mimeType: varchar("mime_type", { length: 100 }),
   size: bigint("size", { mode: "number" }),
+   location: text("location"), 
+  uploader: text("uploader"),  
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

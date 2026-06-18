@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { activities, photos } from "@/lib/schema";
-import { eq, and, desc, like } from "drizzle-orm";
+import { eq, and, desc, ilike } from "drizzle-orm";
 
 interface PhotoItem {
   id: number;
@@ -13,19 +13,28 @@ interface PhotoItem {
   fullUrl: string;
 }
 
+interface PhotoGroup {
+  date: string;
+  location: string | null;
+  uploader: string | null;
+  photos: PhotoItem[];
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
     const title = searchParams.get("title");
     const date = searchParams.get("date");
     const location = searchParams.get("location");
     const uploader = searchParams.get("uploader");
 
     const conditions = [];
-    if (title) conditions.push(like(activities.title, `%${title}%`));
+    if (id) conditions.push(eq(activities.id, Number(id)));
+    if (title) conditions.push(ilike(activities.title, `%${title}%`));
     if (date) conditions.push(eq(photos.activityDate, date));
-    if (location) conditions.push(like(activities.location, `%${location}%`));
-    if (uploader) conditions.push(like(activities.uploader, `%${uploader}%`));
+    if (location) conditions.push(ilike(photos.location, `%${location}%`));
+    if (uploader) conditions.push(ilike(photos.uploader, `%${uploader}%`));
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -47,9 +56,9 @@ export async function GET(request: NextRequest) {
         id: number;
         title: string;
         description: string | null;
-        location: string | null;       // ⬅️ baru
-        uploader: string | null;       // ⬅️ baru
-        datesMap: Map<string, PhotoItem[]>;
+        location: string | null;
+        uploader: string | null;
+        groupsMap: Map<string, PhotoGroup>;
       }
     >();
 
@@ -64,17 +73,22 @@ export async function GET(request: NextRequest) {
           description: act.description,
           location: act.location,
           uploader: act.uploader,
-          datesMap: new Map(),
+          groupsMap: new Map(),
         });
       }
 
       if (photo) {
         const entry = activityMap.get(act.id)!;
-        const dateKey = photo.activityDate;
-        if (!entry.datesMap.has(dateKey)) {
-          entry.datesMap.set(dateKey, []);
+        const groupKey = `${photo.activityDate}__${photo.location ?? ""}__${photo.uploader ?? ""}`;
+        if (!entry.groupsMap.has(groupKey)) {
+          entry.groupsMap.set(groupKey, {
+            date: photo.activityDate,
+            location: photo.location,
+            uploader: photo.uploader,
+            photos: [],
+          });
         }
-        entry.datesMap.get(dateKey)!.push({
+        entry.groupsMap.get(groupKey)!.photos.push({
           id: photo.id,
           driveFileId: photo.driveFileId,
           fileName: photo.fileName,
@@ -93,9 +107,9 @@ export async function GET(request: NextRequest) {
         description: act.description,
         location: act.location,
         uploader: act.uploader,
-        dates: Array.from(act.datesMap.entries())
-          .map(([date, photos]) => ({ date, photos }))
-          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+        dates: Array.from(act.groupsMap.values()).sort(
+          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+        ),
       }))
       .sort((a, b) => {
         const aDate = a.dates[0]?.date || "";

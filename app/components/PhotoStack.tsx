@@ -1,11 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { formatDate } from "@/lib/utils";
 import { Badge } from "@/app/components/ui/badge";
-import { Calendar, ImageIcon, X, Trash2, CheckSquare, Square, FileText, MapPin, User } from "lucide-react";
+import {
+  Calendar, ImageIcon, X, Trash2, CheckSquare, Square, FileText,
+  MapPin, User, Printer, FileDown, Loader2,
+} from "lucide-react";
 
 interface Photo {
   id: number;
@@ -19,6 +22,8 @@ interface Photo {
 
 interface DateGroup {
   date: string;
+  location: string | null;
+  uploader: string | null;
   photos: Photo[];
 }
 
@@ -37,21 +42,62 @@ interface PhotoStackProps {
   isFirstActivity?: boolean;
 }
 
-const MAX_PREVIEW = 10;
+const MAX_PREVIEW = 3;
+
+interface GroupedByDate {
+  date: string;
+  groups: DateGroup[];
+  totalPhotos: number;
+}
+
+function groupByDate(dates: DateGroup[]): GroupedByDate[] {
+  const map = new Map<string, DateGroup[]>();
+  for (const d of dates) {
+    const existing = map.get(d.date) || [];
+    existing.push(d);
+    map.set(d.date, existing);
+  }
+  return Array.from(map.entries())
+    .map(([date, groups]) => ({
+      date,
+      groups,
+      totalPhotos: groups.reduce((sum, g) => sum + g.photos.length, 0),
+    }))
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
 
 export default function PhotoStack({ activity, onRefresh, isFirstActivity }: PhotoStackProps) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedPhotos, setSelectedPhotos] = useState<number[]>([]);
   const [descExpanded, setDescExpanded] = useState(false);
+  const [showPrintMenu, setShowPrintMenu] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const printMenuRef = useRef<HTMLDivElement>(null);
 
   const allPhotos = activity.dates.flatMap((d) => d.photos);
   const totalPhotos = allPhotos.length;
 
-  const getFlatIndex = (dateIndex: number, photoIndex: number) => {
-    let idx = 0;
-    for (let i = 0; i < dateIndex; i++) idx += activity.dates[i].photos.length;
-    return idx + photoIndex;
+  const groupedByDate = groupByDate(activity.dates);
+
+  const uniqueLocations = Array.from(
+    new Set(activity.dates.map((d) => d.location).filter(Boolean) as string[])
+  );
+  const uniqueUploaders = Array.from(
+    new Set(activity.dates.map((d) => d.uploader).filter(Boolean) as string[])
+  );
+
+  const maxExtraRows = Math.max(uniqueLocations.length, uniqueUploaders.length) - 1;
+
+  const findGlobalIndexByPhotoId = (photoId: number): number => {
+    let globalIdx = 0;
+    for (const d of activity.dates) {
+      for (const p of d.photos) {
+        if (p.id === photoId) return globalIdx;
+        globalIdx++;
+      }
+    }
+    return 0;
   };
 
   const toggleSelectMode = () => {
@@ -84,6 +130,46 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity }: Pho
     onRefresh();
   };
 
+  const handleDownloadWord = async () => {
+    setExporting(true);
+    try {
+      const res = await fetch(`/api/activities/${activity.id}/export`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error || "Gagal membuat dokumen Word");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Dokumentasi_${activity.title.replace(/[^a-zA-Z0-9]/g, "_")}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Gagal mengunduh dokumen");
+    } finally {
+      setExporting(false);
+      setShowPrintMenu(false);
+    }
+  };
+
+  const handlePrintPdf = () => {
+    window.open(`/print/${activity.id}`, "_blank");
+    setShowPrintMenu(false);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
+        setShowPrintMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   React.useEffect(() => {
     if (lightboxIndex === null) return;
     const handleKey = (e: KeyboardEvent) => {
@@ -108,18 +194,45 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity }: Pho
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold text-emerald-800 text-base">{activity.title}</h3>
-              <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
-                <span className="flex items-center gap-1"><Calendar className="h-3 w-3 text-emerald-500" />{activity.dates.length} tanggal</span>
-                <span className="flex items-center gap-1"><ImageIcon className="h-3 w-3 text-emerald-500" />{totalPhotos} foto</span>
+              
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1.5 text-xs text-slate-500">
+                <span className="flex items-center gap-1">
+                  <Calendar className="h-3 w-3 text-emerald-500" />
+                  {groupedByDate.length} sesi
+                </span>
+                <span className="flex items-center gap-1">
+                  <ImageIcon className="h-3 w-3 text-emerald-500" />
+                  {totalPhotos} foto
+                </span>
+                {uniqueLocations[0] && (
+                  <span className="flex items-center gap-1">
+                    <MapPin className="h-3 w-3 text-emerald-500" />
+                    {uniqueLocations[0]}
+                  </span>
+                )}
+                {uniqueUploaders[0] && (
+                  <span className="flex items-center gap-1">
+                    <User className="h-3 w-3 text-emerald-500" />
+                    {uniqueUploaders[0]}
+                  </span>
+                )}
               </div>
-              {(activity.location || activity.uploader) && (
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-slate-500">
-                  {activity.location && (
-                    <span className="flex items-center gap-1"><MapPin className="h-3 w-3 text-emerald-500" />{activity.location}</span>
-                  )}
-                  {activity.uploader && (
-                    <span className="flex items-center gap-1"><User className="h-3 w-3 text-emerald-500" />{activity.uploader}</span>
-                  )}
+
+              {maxExtraRows > 0 && (
+                <div className="flex flex-col gap-y-0.5 mt-0.5 text-xs text-slate-500">
+                  {Array.from({ length: maxExtraRows }).map((_, i) => {
+                    const loc = uniqueLocations[i + 1];
+                    const upl = uniqueUploaders[i + 1];
+                    if (!loc && !upl) return null;
+                    return (
+                      <div key={i} className="flex items-center gap-x-3">
+                        {/* Spacer sejajar dengan posisi teks lokasi pertama */}
+                        <span className="inline-block" style={{ width: "calc(0.75rem + 0.75rem + 0.25rem + 2.5rem + 0.75rem + 0.75rem + 0.75rem + 0.25rem)" }} />
+                        {loc && <span>{loc}</span>}
+                        {upl && <span>{upl}</span>}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -127,6 +240,28 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity }: Pho
               <Badge variant="secondary" className="flex items-center gap-1">
                 <ImageIcon className="h-3 w-3" />{totalPhotos}
               </Badge>
+
+              <div className="relative" ref={printMenuRef}>
+                <button
+                  onClick={() => setShowPrintMenu((v) => !v)}
+                  className="text-slate-400 hover:text-emerald-600 transition-colors"
+                  title="Cetak / unduh dokumentasi"
+                  disabled={exporting}
+                >
+                  {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+                </button>
+                {showPrintMenu && (
+                  <div className="absolute right-0 mt-2 w-52 bg-white border border-emerald-100 rounded-lg shadow-lg z-20 overflow-hidden">
+                    <button onClick={handleDownloadWord} className="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50 flex items-center gap-2 text-slate-700">
+                      <FileDown className="h-3.5 w-3.5 text-emerald-600" /> Unduh Word (.docx)
+                    </button>
+                    <button onClick={handlePrintPdf} className="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50 flex items-center gap-2 text-slate-700 border-t border-emerald-50">
+                      <Printer className="h-3.5 w-3.5 text-emerald-600" /> Cetak / Simpan PDF
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {!selectMode ? (
                 <button onClick={toggleSelectMode} className="text-slate-400 hover:text-red-500 transition-colors" title="Pilih foto untuk dihapus">
                   <Trash2 className="h-4 w-4" />
@@ -166,75 +301,114 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity }: Pho
         </div>
 
         {/* Dates & Photos */}
-        <div className="p-4 space-y-4">
-          {activity.dates.map((dateGroup, dateIndex) => {
-            const photosToShow = dateGroup.photos.slice(0, MAX_PREVIEW);
-            const remaining = dateGroup.photos.length - MAX_PREVIEW;
-            return (
-              <motion.div key={dateGroup.date} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: dateIndex * 0.05 }} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
-                    <Calendar className="h-3.5 w-3.5 text-emerald-500" />
-                    {formatDate(dateGroup.date)}
-                  </h4>
-                  <span className="text-xs text-slate-400">{dateGroup.photos.length} foto</span>
-                </div>
-                <div className="flex overflow-x-auto gap-3 pb-2 hide-scrollbar -mx-1 px-1">
-                  {photosToShow.map((photo, photoIndex) => {
-                    const flatIdx = getFlatIndex(dateIndex, photoIndex);
-                    const isFirstPhoto = isFirstActivity && dateIndex === 0 && photoIndex === 0;
-                    return (
-                      <motion.div
-                        key={photo.id}
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: photoIndex * 0.03, duration: 0.3 }}
-                        className={`shrink-0 cursor-pointer group relative ${selectMode ? "opacity-80" : ""}`}
-                        onClick={() => {
-                          if (selectMode) togglePhotoSelect(photo.id);
-                          else setLightboxIndex(flatIdx);
-                        }}
-                      >
-                        <div className="w-32 h-32 rounded-xl overflow-hidden border border-emerald-100 shadow-sm group-hover:shadow-md group-hover:border-emerald-300 transition-all relative">
-                          <Image
-                            src={photo.thumbnailUrl}
-                            alt={photo.fileName || `Foto ${photoIndex + 1}`}
-                            fill
-                            sizes="128px"
-                            className="object-cover group-hover:scale-105 transition-transform duration-300"
-                            unoptimized
-                            loading={isFirstPhoto ? "eager" : "lazy"}
-                            priority={isFirstPhoto}
-                          />
-                          {selectMode && (
-                            <div className="absolute top-1 right-1">
-                              {selectedPhotos.includes(photo.id) ? (
-                                <CheckSquare className="h-5 w-5 text-red-500 drop-shadow-md" />
-                              ) : (
-                                <Square className="h-5 w-5 text-white drop-shadow-md" />
-                              )}
+        <div className="p-4 space-y-6">
+          {groupedByDate.map((dateBlock) => (
+            <div key={dateBlock.date} className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5 text-emerald-500" />
+                  {formatDate(dateBlock.date)}
+                </h4>
+                <span className="text-xs text-slate-400">{dateBlock.totalPhotos} foto</span>
+              </div>
+
+              <div className="space-y-3 pl-2 border-l-2 border-emerald-100">
+                {dateBlock.groups.map((group) => {
+                  const photosToShow = group.photos.slice(0, MAX_PREVIEW);
+                  const remaining = group.photos.length - MAX_PREVIEW;
+                  const globalStartIdx = findGlobalIndexByPhotoId(group.photos[0]?.id || 0);
+
+                  return (
+                    <div key={`${group.date}-${group.location ?? "noloc"}-${group.uploader ?? "noupl"}`} className="space-y-2">
+                      <div className="flex flex-col gap-0.5 text-xs text-slate-500">
+                        {group.location && (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3 text-emerald-500 shrink-0" />
+                            {group.location}
+                          </span>
+                        )}
+                        {group.uploader && (
+                          <span className="flex items-center gap-1">
+                            <User className="h-3 w-3 text-emerald-500 shrink-0" />
+                            {group.uploader}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex overflow-x-auto gap-3 pb-2 hide-scrollbar -mx-1 px-1">
+                        {photosToShow.map((photo, photoIndex) => {
+                          const isFirstPhoto = isFirstActivity && photoIndex === 0;
+                          return (
+                            <motion.div
+                              key={photo.id}
+                              initial={{ opacity: 0, x: 20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: photoIndex * 0.03, duration: 0.3 }}
+                              className={`shrink-0 cursor-pointer group relative ${selectMode ? "opacity-80" : ""}`}
+                              onClick={() => {
+                                if (selectMode) togglePhotoSelect(photo.id);
+                                else setLightboxIndex(globalStartIdx + photoIndex);
+                              }}
+                            >
+                              <div className="w-32 h-32 rounded-xl overflow-hidden border border-emerald-100 shadow-sm group-hover:shadow-md group-hover:border-emerald-300 transition-all relative">
+                                <Image
+                                  src={photo.thumbnailUrl}
+                                  alt={photo.fileName || `Foto ${photoIndex + 1}`}
+                                  fill
+                                  sizes="128px"
+                                  className="object-cover group-hover:scale-105 transition-transform duration-300"
+                                  unoptimized
+                                  loading={isFirstPhoto ? "eager" : "lazy"}
+                                  priority={isFirstPhoto}
+                                />
+                                {selectMode && (
+                                  <div className="absolute top-1 right-1">
+                                    {selectedPhotos.includes(photo.id) ? (
+                                      <CheckSquare className="h-5 w-5 text-red-500 drop-shadow-md" />
+                                    ) : (
+                                      <Square className="h-5 w-5 text-white drop-shadow-md" />
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </motion.div>
+                          );
+                        })}
+
+                        {remaining > 0 && !selectMode && (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.85 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: MAX_PREVIEW * 0.03 }}
+                            className="relative w-32 h-32 shrink-0 cursor-pointer group"
+                            onClick={() => setLightboxIndex(globalStartIdx + MAX_PREVIEW)}
+                          >
+                            <div className="absolute inset-0 rounded-xl bg-emerald-100 border border-emerald-200 rotate-6 translate-x-1.5 translate-y-1" />
+                            <div className="absolute inset-0 rounded-xl bg-emerald-50 border border-emerald-200 -rotate-3 -translate-x-1" />
+                            <div className="absolute inset-0 rounded-xl overflow-hidden border border-emerald-200 shadow-md group-hover:shadow-lg transition-shadow">
+                              <Image
+                                src={group.photos[MAX_PREVIEW].thumbnailUrl}
+                                alt="Foto lainnya"
+                                fill
+                                sizes="128px"
+                                className="object-cover"
+                                unoptimized
+                              />
+                              <div className="absolute inset-0 bg-black/55 group-hover:bg-black/65 transition-colors flex flex-col items-center justify-center text-white">
+                                <ImageIcon className="h-4 w-4 mb-1 opacity-90" />
+                                <span className="text-lg font-bold leading-none">+{remaining}</span>
+                                <span className="text-[10px] mt-0.5">foto lagi</span>
+                              </div>
                             </div>
-                          )}
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                  {remaining > 0 && !selectMode && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: MAX_PREVIEW * 0.03 }}
-                      className="w-32 h-32 shrink-0 rounded-xl bg-linear-to-br from-emerald-50 to-emerald-100 border-2 border-dashed border-emerald-300 flex flex-col items-center justify-center text-emerald-700 cursor-pointer hover:from-emerald-100 hover:to-emerald-200 transition-colors"
-                      onClick={() => setLightboxIndex(getFlatIndex(dateIndex, MAX_PREVIEW))}
-                    >
-                      <span className="text-3xl font-bold">+{remaining}</span>
-                      <span className="text-xs font-medium mt-1">Foto Lainnya</span>
-                    </motion.div>
-                  )}
-                </div>
-              </motion.div>
-            );
-          })}
+                          </motion.div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       </motion.div>
 

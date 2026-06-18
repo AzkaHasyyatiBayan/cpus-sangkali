@@ -18,7 +18,6 @@ interface StorageInfo {
 export default function GalleryPage() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
-  // Sekarang filter memiliki 4 field
   const [filters, setFilters] = useState({
     title: "",
     date: "",
@@ -39,14 +38,18 @@ export default function GalleryPage() {
 
       const res = await fetch(`/api/activities?${params.toString()}`);
       const data = await res.json();
-      if (data.success) {
+      if (data.success && Array.isArray(data.data)) {
         const filtered = data.data.filter((activity: Activity) =>
-          activity.dates.some((d) => d.photos.length > 0)
+          Array.isArray(activity.dates) && 
+          activity.dates.some((d) => d && Array.isArray(d.photos) && d.photos.length > 0)
         );
         setActivities(filtered);
+      } else {
+        setActivities([]);
       }
     } catch (error) {
       console.error("Failed to fetch activities:", error);
+      setActivities([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -71,7 +74,6 @@ export default function GalleryPage() {
     load();
   }, [fetchActivities, fetchStorage]);
 
-  // Handler baru yang menerima 4 parameter
   const handleFilterChange = useCallback(
     (title: string, date: string, location: string, uploader: string) => {
       setFilters({ title, date, location, uploader });
