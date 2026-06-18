@@ -102,27 +102,33 @@ export default function GalleryPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-emerald-100 shadow-sm">
+      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-emerald-100 shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-linear-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-sm">
-              <Camera className="h-5 w-5 text-white" />
-            </div>
+            <Camera className="h-6 w-6 text-emerald-600" strokeWidth={1.5} />
             <div>
-              <h1 className="text-lg font-bold text-emerald-800 leading-tight">CPUS Sangkali</h1>
+              <h1 className="text-lg font-bold text-emerald-800 leading-tight tracking-tight">CPUS Sangkali</h1>
               <p className="text-xs text-slate-500">Galeri Foto Kegiatan</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             {storage && (
-              <div className="flex items-center text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
-                <HardDrive className="h-3 w-3 mr-1" />
+              <div className="flex items-center text-xs text-white bg-emerald-600 px-2.5 py-1 rounded-full shadow-sm">
+                <HardDrive className="h-3 w-3 mr-1.5" />
                 <span className="hidden sm:inline">{formatBytes(storage.used)} / {formatBytes(storage.limit)}</span>
                 <span className="sm:hidden">{storage.percent.toFixed(1)}%</span>
-                {storage.percent > 80 && <span className="ml-1 text-amber-500">({storage.percent.toFixed(1)}%)</span>}
+                {storage.percent > 80 && (
+                  <span className="ml-1 text-amber-200 font-medium">({storage.percent.toFixed(1)}%)</span>
+                )}
               </div>
             )}
-            <Button variant="ghost" size="icon" onClick={handleRefresh} disabled={refreshing} className="text-emerald-600 hover:bg-emerald-50">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={handleRefresh} 
+              disabled={refreshing} 
+              className="text-emerald-600 hover:bg-emerald-50"
+            >
               <RefreshCw className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} />
             </Button>
           </div>

@@ -69,6 +69,9 @@ export default function PrintActivityPage() {
                 <p className="kop-line">E-mail : pkmsangkali@gmail.com</p>
                 <p className="kop-line">TASIKMALAYA</p>
               </div>
+              {/* spacer kosong, lebarnya disamakan dgn kolom logo lewat CSS grid di bawah,
+                  supaya kop-text jadi pusat sungguhan dari lebar konten (sejajar sama caption) */}
+              <div className="kop-spacer" />
             </header>
 
             <div className="kop-pos-row">Kode Pos : 46166</div>
@@ -78,7 +81,6 @@ export default function PrintActivityPage() {
               <p>Dokumentasi Kegiatan</p>
               <p>{group.location ? `${activity.title}, ${group.location}` : activity.title}</p>
               <p>Tanggal {formatTanggalIndonesia(group.date)}</p>
-              {group.uploader && <p>Diunggah oleh: {group.uploader}</p>}
             </div>
 
             <div className="photo-wrap">
@@ -125,26 +127,18 @@ export default function PrintActivityPage() {
         }
 
         .kop {
-          position: relative;
-          min-height: 3.5cm;
+          display: grid;
+          grid-template-columns: 3.3cm 1fr 3.3cm; /* kiri & kanan SAMA lebar -> tengah jadi center sungguhan */
+          align-items: start;
         }
-        .kop-logo {
-          position: absolute;
-          left: 0;
-          top: 0;
-          font-size: 0;
-          line-height: 0;
-        }
-        .kop-logo-img { 
+        .kop-logo { font-size: 0; line-height: 0; }
+        .kop-logo-img {
           width: 3.18cm;
           height: 3.49cm;
-          object-fit: contain; 
+          object-fit: contain;
           display: block;
-          margin: 0;
         }
-        .kop-text {
-          text-align: center;
-        }
+        .kop-text { text-align: center; }
         .kop-pemerintah { font-size: 14pt; margin: 0; }
         .kop-unit {
           font-family: "Arial Black", Arial, sans-serif;
@@ -153,6 +147,7 @@ export default function PrintActivityPage() {
           margin: 0;
         }
         .kop-line { font-size: 12pt; margin: 1pt 0; }
+        .kop-spacer { }
 
         .kop-pos-row { text-align: right; font-size: 12pt; margin: 4px 0 6px; }
         .divider { border-bottom: 3.75pt solid #000; margin: 0 0 18px; }

@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   ImageRun, AlignmentType, BorderStyle, WidthType, PageBreak, VerticalAlign,
+  TableLayoutType,
 } from "docx";
 import sizeOf from "image-size";
 import { CLINIC_INFO } from "@/lib/clinicInfo";
@@ -60,15 +61,18 @@ function buildKopHeader(logoBuffer: Buffer) {
   const noBorder = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" };
   const noBorders = { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder };
 
+  const SIDE_COL_DXA = 1850; 
+  const CENTER_COL_DXA = TOTAL_CONTENT_DXA - SIDE_COL_DXA * 2;
+
   return new Table({
     width: { size: TOTAL_CONTENT_DXA, type: WidthType.DXA },
-    columnWidths: [1200, TOTAL_CONTENT_DXA - 1200],
+    layout: TableLayoutType.FIXED, 
+    columnWidths: [SIDE_COL_DXA, CENTER_COL_DXA, SIDE_COL_DXA],
     rows: [
       new TableRow({
         children: [
-          // ✅ Logo: margin kiri & kanan dihapus agar menempel di tepi kiri garis kop
           new TableCell({
-            width: { size: 1200, type: WidthType.DXA },
+            width: { size: SIDE_COL_DXA, type: WidthType.DXA },
             borders: noBorders,
             verticalAlign: VerticalAlign.TOP,
             margins: { top: 0, bottom: 0, left: 0, right: 0 },
@@ -87,9 +91,9 @@ function buildKopHeader(logoBuffer: Buffer) {
               }),
             ],
           }),
-          // Kolom teks — CENTER penuh
+          // Kolom teks tengah — sekarang benar-benar center dari lebar konten penuh
           new TableCell({
-            width: { size: TOTAL_CONTENT_DXA - 1200, type: WidthType.DXA },
+            width: { size: CENTER_COL_DXA, type: WidthType.DXA },
             borders: noBorders,
             verticalAlign: VerticalAlign.TOP,
             margins: { top: 0, bottom: 0, left: 0, right: 0 },
@@ -100,6 +104,14 @@ function buildKopHeader(logoBuffer: Buffer) {
               arialText(CLINIC_INFO.email, 24),
               arialText(CLINIC_INFO.kota, 24),
             ],
+          }),
+          // Kolom kosong (spacer) — lebar sama dengan kolom logo, ini penyeimbangnya
+          new TableCell({
+            width: { size: SIDE_COL_DXA, type: WidthType.DXA },
+            borders: noBorders,
+            verticalAlign: VerticalAlign.TOP,
+            margins: { top: 0, bottom: 0, left: 0, right: 0 },
+            children: [new Paragraph({ text: "" })],
           }),
         ],
       }),
@@ -172,9 +184,6 @@ export async function GET(
       children.push(serifText("Dokumentasi Kegiatan", 28));
       children.push(serifText(titleLine, 28));
       children.push(serifText(`Tanggal ${formatTanggal(photo.activityDate)}`, 28));
-      if (photo.uploader) {
-        children.push(serifText(`Diunggah oleh: ${photo.uploader}`, 28));
-      }
       children.push(new Paragraph({ text: "" }));
 
       const imgBuffer = await fetchImageBuffer(photo.driveFileId);

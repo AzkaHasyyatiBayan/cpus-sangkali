@@ -6,7 +6,6 @@ import { sql } from "drizzle-orm";
 
 export async function GET() {
   try {
-    // ✅ Ambil langsung dari Cloudinary API (real-time & akurat)
     const usage = await getCloudinaryUsage();
     return NextResponse.json({ success: true, data: usage });
   } catch (error) {
