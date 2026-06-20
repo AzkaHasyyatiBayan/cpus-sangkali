@@ -50,6 +50,11 @@ interface GroupedByDate {
   totalPhotos: number;
 }
 
+interface LocUplPair {
+  location: string | null;
+  uploader: string | null;
+}
+
 function groupByDate(dates: DateGroup[]): GroupedByDate[] {
   const map = new Map<string, DateGroup[]>();
   for (const d of dates) {
@@ -66,6 +71,43 @@ function groupByDate(dates: DateGroup[]): GroupedByDate[] {
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
+function getUniquePairs(dates: DateGroup[]): LocUplPair[] {
+  const seen = new Set<string>();
+  const pairs: LocUplPair[] = [];
+  for (const d of dates) {
+    if (!d.location && !d.uploader) continue;
+    const key = `${d.location ?? ""}__${d.uploader ?? ""}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      pairs.push({ location: d.location, uploader: d.uploader });
+    }
+  }
+  return pairs;
+}
+
+function LocUplGrid({ pairs }: { pairs: LocUplPair[] }) {
+  if (pairs.length === 0) return null;
+  return (
+    <div
+      className="grid gap-x-2 gap-y-1 items-center text-xs text-slate-500"
+      style={{ gridTemplateColumns: "max-content max-content max-content max-content" }}
+    >
+      {pairs.map((pair, i) => (
+        <React.Fragment key={i}>
+          <span className="flex items-center">
+            {i === 0 && pair.location && <MapPin className="h-3 w-3 text-emerald-500 shrink-0" />}
+          </span>
+          <span>{pair.location}</span>
+          <span className="flex items-center">
+            {i === 0 && pair.uploader && <User className="h-3 w-3 text-emerald-500 shrink-0" />}
+          </span>
+          <span>{pair.uploader}</span>
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
 export default function PhotoStack({ activity, onRefresh, isFirstActivity }: PhotoStackProps) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [selectMode, setSelectMode] = useState(false);
@@ -79,15 +121,7 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity }: Pho
   const totalPhotos = allPhotos.length;
 
   const groupedByDate = groupByDate(activity.dates);
-
-  const uniqueLocations = Array.from(
-    new Set(activity.dates.map((d) => d.location).filter(Boolean) as string[])
-  );
-  const uniqueUploaders = Array.from(
-    new Set(activity.dates.map((d) => d.uploader).filter(Boolean) as string[])
-  );
-
-  const maxExtraRows = Math.max(uniqueLocations.length, uniqueUploaders.length) - 1;
+  const activityPairs = getUniquePairs(activity.dates);
 
   const findGlobalIndexByPhotoId = (photoId: number): number => {
     let globalIdx = 0;
@@ -194,47 +228,18 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity }: Pho
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold text-emerald-800 text-base">{activity.title}</h3>
-              
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1.5 text-xs text-slate-500">
-                <span className="flex items-center gap-1">
+
+              <div className="flex flex-wrap items-start gap-x-3 gap-y-1 mt-1.5">
+                <span className="flex items-center gap-1 shrink-0 text-xs text-slate-500">
                   <Calendar className="h-3 w-3 text-emerald-500" />
                   {groupedByDate.length} sesi
                 </span>
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1 shrink-0 text-xs text-slate-500">
                   <ImageIcon className="h-3 w-3 text-emerald-500" />
                   {totalPhotos} foto
                 </span>
-                {uniqueLocations[0] && (
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-3 w-3 text-emerald-500" />
-                    {uniqueLocations[0]}
-                  </span>
-                )}
-                {uniqueUploaders[0] && (
-                  <span className="flex items-center gap-1">
-                    <User className="h-3 w-3 text-emerald-500" />
-                    {uniqueUploaders[0]}
-                  </span>
-                )}
+                <LocUplGrid pairs={activityPairs} />
               </div>
-
-              {maxExtraRows > 0 && (
-                <div className="flex flex-col gap-y-0.5 mt-0.5 text-xs text-slate-500">
-                  {Array.from({ length: maxExtraRows }).map((_, i) => {
-                    const loc = uniqueLocations[i + 1];
-                    const upl = uniqueUploaders[i + 1];
-                    if (!loc && !upl) return null;
-                    return (
-                      <div key={i} className="flex items-center gap-x-3">
-                        {/* Spacer sejajar dengan posisi teks lokasi pertama */}
-                        <span className="inline-block" style={{ width: "calc(0.75rem + 0.75rem + 0.25rem + 2.5rem + 0.75rem + 0.75rem + 0.75rem + 0.25rem)" }} />
-                        {loc && <span>{loc}</span>}
-                        {upl && <span>{upl}</span>}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <Badge variant="secondary" className="flex items-center gap-1">
@@ -256,7 +261,7 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity }: Pho
                       <FileDown className="h-3.5 w-3.5 text-emerald-600" /> Unduh Word (.docx)
                     </button>
                     <button onClick={handlePrintPdf} className="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50 flex items-center gap-2 text-slate-700 border-t border-emerald-50">
-                      <Printer className="h-3.5 w-3.5 text-emerald-600" /> Cetak / Simpan PDF
+                      <Printer className="h-3.5 w-3.5 text-emerald-600" /> Cetak
                     </button>
                   </div>
                 )}
@@ -301,9 +306,9 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity }: Pho
         </div>
 
         {/* Dates & Photos */}
-        <div className="p-4 space-y-6">
+        <div className="p-4 space-y-3">
           {groupedByDate.map((dateBlock) => (
-            <div key={dateBlock.date} className="space-y-3">
+            <div key={dateBlock.date} className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
                   <Calendar className="h-3.5 w-3.5 text-emerald-500" />
@@ -312,30 +317,34 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity }: Pho
                 <span className="text-xs text-slate-400">{dateBlock.totalPhotos} foto</span>
               </div>
 
-              <div className="space-y-3 pl-2 border-l-2 border-emerald-100">
-                {dateBlock.groups.map((group) => {
+              <div
+                className="grid gap-x-2 gap-y-1 items-start pl-1 border-l-2 border-emerald-100"
+                style={{ gridTemplateColumns: "max-content max-content max-content max-content" }}
+              >
+                {dateBlock.groups.map((group, groupIndex) => {
                   const photosToShow = group.photos.slice(0, MAX_PREVIEW);
                   const remaining = group.photos.length - MAX_PREVIEW;
                   const globalStartIdx = findGlobalIndexByPhotoId(group.photos[0]?.id || 0);
 
                   return (
-                    <div key={`${group.date}-${group.location ?? "noloc"}-${group.uploader ?? "noupl"}`} className="space-y-2">
-                      <div className="flex flex-col gap-0.5 text-xs text-slate-500">
-                        {group.location && (
-                          <span className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3 text-emerald-500 shrink-0" />
-                            {group.location}
-                          </span>
+                    <React.Fragment key={`${group.date}-${group.location ?? "noloc"}-${group.uploader ?? "noupl"}-${groupIndex}`}>
+                      <span className="flex items-center text-xs text-slate-500">
+                        {groupIndex === 0 && group.location && (
+                          <MapPin className="h-3 w-3 text-emerald-500 shrink-0" />
                         )}
-                        {group.uploader && (
-                          <span className="flex items-center gap-1">
-                            <User className="h-3 w-3 text-emerald-500 shrink-0" />
-                            {group.uploader}
-                          </span>
+                      </span>
+                      <span className="text-xs text-slate-500">{group.location}</span>
+                      <span className="flex items-center text-xs text-slate-500">
+                        {groupIndex === 0 && group.uploader && (
+                          <User className="h-3 w-3 text-emerald-500 shrink-0" />
                         )}
-                      </div>
+                      </span>
+                      <span className="text-xs text-slate-500">{group.uploader}</span>
 
-                      <div className="flex overflow-x-auto gap-3 pb-2 hide-scrollbar -mx-1 px-1">
+                      <div
+                        className="flex overflow-x-auto gap-3 pb-0 hide-scrollbar -mx-1 px-1"
+                        style={{ gridColumn: "1 / -1" }}
+                      >
                         {photosToShow.map((photo, photoIndex) => {
                           const isFirstPhoto = isFirstActivity && photoIndex === 0;
                           return (
@@ -403,7 +412,7 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity }: Pho
                           </motion.div>
                         )}
                       </div>
-                    </div>
+                    </React.Fragment>
                   );
                 })}
               </div>

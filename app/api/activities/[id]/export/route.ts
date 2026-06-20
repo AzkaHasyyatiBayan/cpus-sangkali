@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   ImageRun, AlignmentType, BorderStyle, WidthType, PageBreak, VerticalAlign,
-  TableLayoutType,
+  TableLayoutType, LineRuleType,
 } from "docx";
 import sizeOf from "image-size";
 import { CLINIC_INFO } from "@/lib/clinicInfo";
@@ -46,6 +46,8 @@ async function fetchImageBuffer(driveFileId: string): Promise<Buffer> {
 function arialText(text: string, sizeHalfPt: number, font: string = "Arial") {
   return new Paragraph({
     alignment: AlignmentType.CENTER,
+    // line: 240 = single spacing (~1.0 di Word), after: 0 = rapatkan jarak antar baris kop
+    spacing: { after: 0, line: 240, lineRule: LineRuleType.AUTO },
     children: [new TextRun({ text, size: sizeHalfPt, font })],
   });
 }
@@ -61,12 +63,12 @@ function buildKopHeader(logoBuffer: Buffer) {
   const noBorder = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" };
   const noBorders = { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder };
 
-  const SIDE_COL_DXA = 1850; 
+  const SIDE_COL_DXA = 1850;
   const CENTER_COL_DXA = TOTAL_CONTENT_DXA - SIDE_COL_DXA * 2;
 
   return new Table({
     width: { size: TOTAL_CONTENT_DXA, type: WidthType.DXA },
-    layout: TableLayoutType.FIXED, 
+    layout: TableLayoutType.FIXED,
     columnWidths: [SIDE_COL_DXA, CENTER_COL_DXA, SIDE_COL_DXA],
     rows: [
       new TableRow({
@@ -91,7 +93,6 @@ function buildKopHeader(logoBuffer: Buffer) {
               }),
             ],
           }),
-          // Kolom teks tengah — sekarang benar-benar center dari lebar konten penuh
           new TableCell({
             width: { size: CENTER_COL_DXA, type: WidthType.DXA },
             borders: noBorders,
@@ -105,7 +106,6 @@ function buildKopHeader(logoBuffer: Buffer) {
               arialText(CLINIC_INFO.kota, 24),
             ],
           }),
-          // Kolom kosong (spacer) — lebar sama dengan kolom logo, ini penyeimbangnya
           new TableCell({
             width: { size: SIDE_COL_DXA, type: WidthType.DXA },
             borders: noBorders,
@@ -122,7 +122,7 @@ function buildKopHeader(logoBuffer: Buffer) {
 function buildKodePosRow() {
   return new Paragraph({
     alignment: AlignmentType.RIGHT,
-    spacing: { before: 40, after: 80 },
+    spacing: { before: 30, after: 80 },
     children: [new TextRun({ text: CLINIC_INFO.kodePos, size: 24, font: "Arial" })],
   });
 }

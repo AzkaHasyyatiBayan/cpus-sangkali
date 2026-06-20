@@ -44,7 +44,7 @@ export default function PrintActivityPage() {
       <div className="no-print toolbar">
         <span>Pratinjau Cetak: {activity.title}</span>
         <button onClick={() => window.print()} className="print-btn">
-          <Printer className="h-4 w-4" /> Cetak / Simpan PDF
+          <Printer className="h-4 w-4" /> Cetak
         </button>
       </div>
 
@@ -69,8 +69,6 @@ export default function PrintActivityPage() {
                 <p className="kop-line">E-mail : pkmsangkali@gmail.com</p>
                 <p className="kop-line">TASIKMALAYA</p>
               </div>
-              {/* spacer kosong, lebarnya disamakan dgn kolom logo lewat CSS grid di bawah,
-                  supaya kop-text jadi pusat sungguhan dari lebar konten (sejajar sama caption) */}
               <div className="kop-spacer" />
             </header>
 
@@ -128,7 +126,7 @@ export default function PrintActivityPage() {
 
         .kop {
           display: grid;
-          grid-template-columns: 3.3cm 1fr 3.3cm; /* kiri & kanan SAMA lebar -> tengah jadi center sungguhan */
+          grid-template-columns: 3.3cm 1fr 3.3cm;
           align-items: start;
         }
         .kop-logo { font-size: 0; line-height: 0; }
@@ -139,17 +137,18 @@ export default function PrintActivityPage() {
           display: block;
         }
         .kop-text { text-align: center; }
+        .kop-text p { line-height: 1.15; } /* rapatkan jarak antar baris kop, setara ~1.0-1.15 di Word */
         .kop-pemerintah { font-size: 14pt; margin: 0; }
         .kop-unit {
           font-family: "Arial Black", Arial, sans-serif;
           font-weight: 900;
-          font-size: 18pt;
+          font-size: 15pt;
           margin: 0;
         }
         .kop-line { font-size: 12pt; margin: 1pt 0; }
         .kop-spacer { }
 
-        .kop-pos-row { text-align: right; font-size: 12pt; margin: 4px 0 6px; }
+        .kop-pos-row { text-align: right; font-size: 12pt; margin: 0px 0 6px; }
         .divider { border-bottom: 3.75pt solid #000; margin: 0 0 18px; }
 
         .caption { text-align: center; margin-bottom: 18px; font-family: "Times New Roman", Times, serif; }
