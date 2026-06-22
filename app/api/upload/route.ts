@@ -43,10 +43,35 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(arrayBuffer);
     const fileSize = buffer.length;
 
+    // Upload ke Cloudinary (penyimpanan utama)
+    console.log("🔵 Upload ke Cloudinary...");
     const driveFileId = await uploadToGoogleDrive(
       buffer,
       `${title}_${Date.now()}_${file.name}`
     );
+    console.log("🔵 Cloudinary OK:", driveFileId);
+
+    // Nama file custom untuk backup GDrive
+    const safeTitle = title.trim().replace(/[^a-zA-Z0-9]/g, "_");
+    const safeLocation = (location || "tanpa-lokasi").trim().replace(/[^a-zA-Z0-9]/g, "_");
+    const safeUploader = (uploader || "tanpa-pengupload").trim().replace(/[^a-zA-Z0-9]/g, "_");
+    const ext = file.type === "image/webp" ? "webp" : file.type.split("/")[1] || "jpg";
+    const backupFileName = `${activityDate}_${safeTitle}_${safeLocation}_${safeUploader}_${Date.now()}.${ext}`;
+
+    // Backup ke Google Drive
+    console.log("🟡 Mulai backup ke Google Drive...");
+    try {
+      const { uploadBackupToGoogleDrive } = await import("@/lib/googleDrive");
+      console.log("🟡 Import OK, upload ke Drive...");
+      await uploadBackupToGoogleDrive(
+        buffer,
+        backupFileName,
+        file.type
+      );
+      console.log("🟢 Backup ke Google Drive berhasil");
+    } catch (e) {
+      console.error("🔴 Backup ke Google Drive gagal:", e);
+    }
 
     let [activity] = await db
       .select()
@@ -65,8 +90,6 @@ export async function POST(request: NextRequest) {
         })
         .returning();
     } else {
-      // location/uploader di level activity ini cuma fallback agregat (legacy),
-      // sumber kebenaran utama sekarang ada di tabel photos per batch upload
       const changed: Record<string, string> = {};
       if (description?.trim() && !activity.description) changed.description = description.trim();
       if (location?.trim() && !activity.location) changed.location = location.trim();
@@ -89,8 +112,8 @@ export async function POST(request: NextRequest) {
         fileName: file.name,
         mimeType: file.type,
         size: fileSize,
-        location: location?.trim() || null,  
-        uploader: uploader?.trim() || null,  
+        location: location?.trim() || null,
+        uploader: uploader?.trim() || null,
       })
       .returning();
 

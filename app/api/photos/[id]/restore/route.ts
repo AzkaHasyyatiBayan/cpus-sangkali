@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { photos } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 
-export async function DELETE(
+export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -14,25 +14,15 @@ export async function DELETE(
   }
 
   try {
-    const [photo] = await db
-      .select()
-      .from(photos)
-      .where(eq(photos.id, photoId));
-
-    if (!photo) {
-      return NextResponse.json({ error: "Foto tidak ditemukan" }, { status: 404 });
-    }
-
-    // Soft delete — tidak hapus dari Cloudinary, hanya tandai deletedAt
     await db
       .update(photos)
-      .set({ deletedAt: new Date() })
+      .set({ deletedAt: null })
       .where(eq(photos.id, photoId));
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Gagal menghapus foto";
-    console.error("Delete photo error:", error);
+    const message = error instanceof Error ? error.message : "Gagal restore foto";
+    console.error("Restore photo error:", error);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

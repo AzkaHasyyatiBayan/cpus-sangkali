@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { activities, photos } from "@/lib/schema";
-import { eq, and, desc, ilike } from "drizzle-orm";
+import { eq, and, desc, ilike, isNull } from "drizzle-orm";
 
 interface PhotoItem {
   id: number;
@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get("date");
     const location = searchParams.get("location");
     const uploader = searchParams.get("uploader");
+    const includeDeleted = searchParams.get("includeDeleted") === "true";
 
     const conditions = [];
     if (id) conditions.push(eq(activities.id, Number(id)));
@@ -35,6 +36,11 @@ export async function GET(request: NextRequest) {
     if (date) conditions.push(eq(photos.activityDate, date));
     if (location) conditions.push(ilike(photos.location, `%${location}%`));
     if (uploader) conditions.push(ilike(photos.uploader, `%${uploader}%`));
+    
+    // Filter foto yang belum dihapus (kecuali includeDeleted=true untuk halaman trash)
+    if (!includeDeleted) {
+      conditions.push(isNull(photos.deletedAt));
+    }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Camera, FolderOpen, RefreshCw, HardDrive, AlertTriangle } from "lucide-react";
+import { Camera, FolderOpen, RefreshCw, HardDrive, AlertTriangle, Trash2, Wrench } from "lucide-react";
 import CameraUploader from "@/app/components/CameraUploader";
 import ActivityFilter from "@/app/components/ActivityFilter";
 import PhotoStack, { type Activity } from "@/app/components/PhotoStack";
@@ -26,6 +26,9 @@ export default function GalleryPage() {
   });
   const [refreshing, setRefreshing] = useState(false);
   const [storage, setStorage] = useState<StorageInfo | null>(null);
+  const [gdriveStorage, setGdriveStorage] = useState<StorageInfo | null>(null);
+  const [tokenExpired, setTokenExpired] = useState(false);
+  const [dismissToken, setDismissToken] = useState(false);
 
   const fetchActivities = useCallback(async () => {
     setLoading(true);
@@ -66,13 +69,27 @@ export default function GalleryPage() {
     }
   }, []);
 
+  const fetchGDriveStorage = useCallback(async () => {
+    try {
+      const res = await fetch("/api/storage/gdrive");
+      const data = await res.json();
+      if (data.success) {
+        setGdriveStorage(data.data);
+        setTokenExpired(false);
+      }
+    } catch {
+      // Token mungkin expired
+    }
+  }, []);
+
   useEffect(() => {
     const load = async () => {
       await fetchActivities();
       await fetchStorage();
+      await fetchGDriveStorage();
     };
     load();
-  }, [fetchActivities, fetchStorage]);
+  }, [fetchActivities, fetchStorage, fetchGDriveStorage]);
 
   const handleFilterChange = useCallback(
     (title: string, date: string, location: string, uploader: string) => {
@@ -85,19 +102,29 @@ export default function GalleryPage() {
     setRefreshing(true);
     fetchActivities();
     fetchStorage();
-  }, [fetchActivities, fetchStorage]);
+    fetchGDriveStorage();
+  }, [fetchActivities, fetchStorage, fetchGDriveStorage]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     fetchActivities();
     fetchStorage();
-  }, [fetchActivities, fetchStorage]);
+    fetchGDriveStorage();
+  }, [fetchActivities, fetchStorage, fetchGDriveStorage]);
+
+  const handleDismissToken = () => {
+    setDismissToken(true);
+    // Muncul lagi setelah 3 jam
+    setTimeout(() => setDismissToken(false), 3 * 60 * 60 * 1000);
+  };
 
   const totalPhotos = activities.reduce(
     (sum, a) => sum + a.dates.reduce((s, d) => s + d.photos.length, 0),
     0
   );
   const isNearLimit = storage && storage.percent > 90;
+  const isGDriveNearLimit = gdriveStorage && gdriveStorage.percent > 80;
+  const isGDriveFull = gdriveStorage && gdriveStorage.percent >= 95;
   const recommendedDeleteBytes = storage ? storage.used - storage.limit * 0.75 : 0;
 
   return (
@@ -112,6 +139,16 @@ export default function GalleryPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* Link ke Trash */}
+            <a
+              href="/trash"
+              className="flex items-center gap-1 text-xs text-slate-500 hover:text-red-500 transition-colors bg-slate-100 hover:bg-red-50 px-2.5 py-1 rounded-full"
+              title="Tempat Sampah"
+            >
+              <Trash2 className="h-3 w-3" />
+              <span className="hidden sm:inline">Trash</span>
+            </a>
+
             {storage && (
               <div className="flex items-center text-xs text-white bg-emerald-600 px-2.5 py-1 rounded-full shadow-sm">
                 <HardDrive className="h-3 w-3 mr-1.5" />
@@ -133,10 +170,36 @@ export default function GalleryPage() {
             </Button>
           </div>
         </div>
+
+        {/* Peringatan Cloudinary hampir penuh */}
         {isNearLimit && (
           <div className="bg-red-50 border-t border-red-200 px-4 py-2 text-sm text-red-700 flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-red-500" />
             <span>Penyimpanan hampir penuh ({storage!.percent.toFixed(1)}%). Disarankan menghapus sekitar <strong>{formatBytes(recommendedDeleteBytes)}</strong> foto.</span>
+          </div>
+        )}
+
+        {/* Peringatan Google Drive hampir penuh */}
+        {isGDriveNearLimit && gdriveStorage && (
+          <div className={`border-t px-4 py-2 text-sm flex items-center gap-2 ${isGDriveFull ? "bg-red-50 border-red-200 text-red-700" : "bg-amber-50 border-amber-200 text-amber-700"}`}>
+            <HardDrive className={`h-4 w-4 ${isGDriveFull ? "text-red-500" : "text-amber-500"}`} />
+            <span>
+              {isGDriveFull 
+                ? `Google Drive backup PENUH! (${gdriveStorage.percent.toFixed(1)}%). Segera hapus file lama di Google Drive.`
+                : `Google Drive backup tersisa ${formatBytes(gdriveStorage.limit - gdriveStorage.used)} (${gdriveStorage.percent.toFixed(1)}% terpakai)`
+              }
+            </span>
+          </div>
+        )}
+
+        {/* Notifikasi token expired */}
+        {tokenExpired && !dismissToken && (
+          <div className="bg-blue-50 border-t border-blue-200 px-4 py-2 text-sm text-blue-700 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Wrench className="h-4 w-4 text-blue-500 shrink-0" />
+              <span>Token Google Drive expired. Backup tidak berjalan. <a href="/setup-backup" className="underline font-medium">Setup ulang di sini</a></span>
+            </div>
+            <button onClick={handleDismissToken} className="text-blue-400 hover:text-blue-600 shrink-0 text-xs">Nanti</button>
           </div>
         )}
       </header>

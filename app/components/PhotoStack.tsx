@@ -194,6 +194,12 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity }: Pho
     setShowPrintMenu(false);
   };
 
+  // ZIP per kegiatan
+  const handleBackupZip = () => {
+    window.open(`/api/backup/download?activityId=${activity.id}`, "_blank");
+    setShowPrintMenu(false);
+  };
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (printMenuRef.current && !printMenuRef.current.contains(e.target as Node)) {
@@ -262,6 +268,9 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity }: Pho
                     </button>
                     <button onClick={handlePrintPdf} className="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50 flex items-center gap-2 text-slate-700 border-t border-emerald-50">
                       <Printer className="h-3.5 w-3.5 text-emerald-600" /> Cetak
+                    </button>
+                    <button onClick={handleBackupZip} className="w-full text-left px-3 py-2 text-sm hover:bg-emerald-50 flex items-center gap-2 text-slate-700 border-t border-emerald-50">
+                      <FileDown className="h-3.5 w-3.5 text-emerald-600" /> Download Backup ZIP
                     </button>
                   </div>
                 )}

@@ -40,7 +40,6 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
   const wordCount = description.trim() ? description.trim().split(/\s+/).filter(Boolean).length : 0;
   const isOverLimit = wordCount > MAX_DESCRIPTION_WORDS;
 
-  // Ambil saran saat modal terbuka
   useEffect(() => {
     if (isOpen) {
       fetch("/api/activities/titles")
@@ -94,9 +93,9 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
       for (let i = 0; i < files.length; i++) {
         const compressedFile = await new Promise<File>((resolve, reject) => {
           new Compressor(files[i], {
-            maxWidth: 1920,
-            maxHeight: 1920,
-            quality: 0.8,
+            maxWidth: 1600,
+            maxHeight: 1600,
+            quality: 0.6, // Kompresi lebih agresif
             mimeType: "image/webp",
             success(result) { resolve(result as File); },
             error(err) { reject(err); },
@@ -309,7 +308,7 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
                       </div>
                       <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileChange} className="hidden" disabled={isUploading} />
                       <input ref={galleryInputRef} type="file" accept="image/*" multiple onChange={handleFileChange} className="hidden" disabled={isUploading} />
-                      <p className="text-xs text-slate-400 mt-2 text-center">JPG, PNG, WEBP • Maks 10MB per foto</p>
+                      <p className="text-xs text-slate-400 mt-2 text-center">JPG, PNG, WEBP • Maks 1MB per foto</p>
                     </div>
 
                     {/* Preview */}
