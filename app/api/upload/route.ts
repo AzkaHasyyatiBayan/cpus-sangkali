@@ -55,20 +55,24 @@ export async function POST(request: NextRequest) {
     const safeTitle = title.trim().replace(/[^a-zA-Z0-9]/g, "_");
     const safeLocation = (location || "tanpa-lokasi").trim().replace(/[^a-zA-Z0-9]/g, "_");
     const safeUploader = (uploader || "tanpa-pengupload").trim().replace(/[^a-zA-Z0-9]/g, "_");
-    const ext = file.type === "image/webp" ? "webp" : file.type.split("/")[1] || "jpg";
-    const backupFileName = `${activityDate}_${safeTitle}_${safeLocation}_${safeUploader}_${Date.now()}.${ext}`;
+    const backupFileName = `${activityDate}_${safeTitle}_${safeLocation}_${safeUploader}_${Date.now()}`;
 
-    // Backup ke Google Drive
+    // Backup ke Google Drive (konversi ke JPG)
     console.log("🟡 Mulai backup ke Google Drive...");
     try {
       const { uploadBackupToGoogleDrive } = await import("@/lib/googleDrive");
-      console.log("🟡 Import OK, upload ke Drive...");
-      await uploadBackupToGoogleDrive(
-        buffer,
-        backupFileName,
-        file.type
-      );
-      console.log("🟢 Backup ke Google Drive berhasil");
+      console.log("🟡 Import OK, konversi ke JPG...");
+
+      // Konversi buffer ke JPG
+      const sharp = (await import("sharp")).default;
+      const jpgBuffer = await sharp(buffer)
+        .jpeg({ quality: 85 })
+        .toBuffer();
+
+      const jpgFileName = `${backupFileName}.jpg`;
+      console.log("🟡 Upload ke Drive...");
+      await uploadBackupToGoogleDrive(jpgBuffer, jpgFileName, "image/jpeg");
+      console.log("🟢 Backup ke Google Drive berhasil (JPG)");
     } catch (e) {
       console.error("🔴 Backup ke Google Drive gagal:", e);
     }

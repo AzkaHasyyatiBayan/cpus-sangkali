@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
     }
 
     const zip = new AdmZip();
+    const sharp = (await import("sharp")).default;
 
     for (const photo of allPhotos) {
       const url = `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/${photo.driveFileId}`;
@@ -32,8 +33,14 @@ export async function GET(request: NextRequest) {
         const res = await fetch(url);
         if (res.ok) {
           const buffer = Buffer.from(await res.arrayBuffer());
-          const ext = photo.mimeType === "image/webp" ? "webp" : "jpg";
-          zip.addFile(`${photo.fileName || photo.driveFileId}.${ext}`, buffer);
+
+          // Konversi ke PNG (lossless)
+          const pngBuffer = await sharp(buffer)
+            .png()
+            .toBuffer();
+
+          const nameWithoutExt = (photo.fileName || photo.driveFileId).replace(/\.\w+$/, "");
+          zip.addFile(`${nameWithoutExt}.png`, pngBuffer);
         }
       } catch (e) {
         console.error(`Gagal fetch foto ${photo.id}:`, e);

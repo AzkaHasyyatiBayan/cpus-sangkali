@@ -50,11 +50,6 @@ interface GroupedByDate {
   totalPhotos: number;
 }
 
-interface LocUplPair {
-  location: string | null;
-  uploader: string | null;
-}
-
 function groupByDate(dates: DateGroup[]): GroupedByDate[] {
   const map = new Map<string, DateGroup[]>();
   for (const d of dates) {
@@ -71,43 +66,6 @@ function groupByDate(dates: DateGroup[]): GroupedByDate[] {
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
-function getUniquePairs(dates: DateGroup[]): LocUplPair[] {
-  const seen = new Set<string>();
-  const pairs: LocUplPair[] = [];
-  for (const d of dates) {
-    if (!d.location && !d.uploader) continue;
-    const key = `${d.location ?? ""}__${d.uploader ?? ""}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      pairs.push({ location: d.location, uploader: d.uploader });
-    }
-  }
-  return pairs;
-}
-
-function LocUplGrid({ pairs }: { pairs: LocUplPair[] }) {
-  if (pairs.length === 0) return null;
-  return (
-    <div
-      className="grid gap-x-2 gap-y-1 items-center text-xs text-slate-500"
-      style={{ gridTemplateColumns: "max-content max-content max-content max-content" }}
-    >
-      {pairs.map((pair, i) => (
-        <React.Fragment key={i}>
-          <span className="flex items-center">
-            {i === 0 && pair.location && <MapPin className="h-3 w-3 text-emerald-500 shrink-0" />}
-          </span>
-          <span>{pair.location}</span>
-          <span className="flex items-center">
-            {i === 0 && pair.uploader && <User className="h-3 w-3 text-emerald-500 shrink-0" />}
-          </span>
-          <span>{pair.uploader}</span>
-        </React.Fragment>
-      ))}
-    </div>
-  );
-}
-
 export default function PhotoStack({ activity, onRefresh, isFirstActivity }: PhotoStackProps) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [selectMode, setSelectMode] = useState(false);
@@ -121,7 +79,13 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity }: Pho
   const totalPhotos = allPhotos.length;
 
   const groupedByDate = groupByDate(activity.dates);
-  const activityPairs = getUniquePairs(activity.dates);
+
+  const uniqueLocations = Array.from(
+    new Set(activity.dates.map((d) => d.location).filter(Boolean) as string[])
+  );
+  const uniqueUploaders = Array.from(
+    new Set(activity.dates.map((d) => d.uploader).filter(Boolean) as string[])
+  );
 
   const findGlobalIndexByPhotoId = (photoId: number): number => {
     let globalIdx = 0;
@@ -194,7 +158,6 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity }: Pho
     setShowPrintMenu(false);
   };
 
-  // ZIP per kegiatan
   const handleBackupZip = () => {
     window.open(`/api/backup/download?activityId=${activity.id}`, "_blank");
     setShowPrintMenu(false);
@@ -235,16 +198,46 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity }: Pho
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold text-emerald-800 text-base">{activity.title}</h3>
 
-              <div className="flex flex-wrap items-start gap-x-3 gap-y-1 mt-1.5">
-                <span className="flex items-center gap-1 shrink-0 text-xs text-slate-500">
+              {/* Preview info: sesi | foto | [lokasi kolom] | [uploader kolom] */}
+              <div className="flex flex-wrap items-start gap-x-3 gap-y-0.5 mt-1.5 text-xs text-slate-500">
+                <span className="flex items-center gap-1 shrink-0">
                   <Calendar className="h-3 w-3 text-emerald-500" />
                   {groupedByDate.length} sesi
                 </span>
-                <span className="flex items-center gap-1 shrink-0 text-xs text-slate-500">
+                <span className="flex items-center gap-1 shrink-0">
                   <ImageIcon className="h-3 w-3 text-emerald-500" />
                   {totalPhotos} foto
                 </span>
-                <LocUplGrid pairs={activityPairs} />
+
+                {/* Kolom lokasi: icon hanya di baris pertama, sisanya menjorok sejajar teks */}
+                {uniqueLocations.length > 0 && (
+                  <div className="flex flex-col gap-0.5">
+                    {uniqueLocations.map((loc, i) => (
+                      <span key={i} className="flex items-center gap-1">
+                        {i === 0
+                          ? <MapPin className="h-3 w-3 text-emerald-500 shrink-0" />
+                          : <span className="inline-block w-3 shrink-0" />
+                        }
+                        {loc}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Kolom uploader: icon hanya di baris pertama, sisanya menjorok sejajar teks */}
+                {uniqueUploaders.length > 0 && (
+                  <div className="flex flex-col gap-0.5">
+                    {uniqueUploaders.map((upl, i) => (
+                      <span key={i} className="flex items-center gap-1">
+                        {i === 0
+                          ? <User className="h-3 w-3 text-emerald-500 shrink-0" />
+                          : <span className="inline-block w-3 shrink-0" />
+                        }
+                        {upl}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -316,117 +309,123 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity }: Pho
 
         {/* Dates & Photos */}
         <div className="p-4 space-y-3">
-          {groupedByDate.map((dateBlock) => (
-            <div key={dateBlock.date} className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
-                  <Calendar className="h-3.5 w-3.5 text-emerald-500" />
-                  {formatDate(dateBlock.date)}
-                </h4>
-                <span className="text-xs text-slate-400">{dateBlock.totalPhotos} foto</span>
-              </div>
+          {groupedByDate.map((dateBlock) => {
+            let lastLocation: string | null = null;
 
-              <div
-                className="grid gap-x-2 gap-y-1 items-start pl-1 border-l-2 border-emerald-100"
-                style={{ gridTemplateColumns: "max-content max-content max-content max-content" }}
-              >
-                {dateBlock.groups.map((group, groupIndex) => {
-                  const photosToShow = group.photos.slice(0, MAX_PREVIEW);
-                  const remaining = group.photos.length - MAX_PREVIEW;
-                  const globalStartIdx = findGlobalIndexByPhotoId(group.photos[0]?.id || 0);
+            return (
+              <div key={dateBlock.date} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5 text-emerald-500" />
+                    {formatDate(dateBlock.date)}
+                  </h4>
+                  <span className="text-xs text-slate-400">{dateBlock.totalPhotos} foto</span>
+                </div>
 
-                  return (
-                    <React.Fragment key={`${group.date}-${group.location ?? "noloc"}-${group.uploader ?? "noupl"}-${groupIndex}`}>
-                      <span className="flex items-center text-xs text-slate-500">
-                        {groupIndex === 0 && group.location && (
-                          <MapPin className="h-3 w-3 text-emerald-500 shrink-0" />
+                <div className="space-y-3 pl-1 border-l-2 border-emerald-100">
+                  {dateBlock.groups.map((group, groupIndex) => {
+                    const photosToShow = group.photos.slice(0, MAX_PREVIEW);
+                    const remaining = group.photos.length - MAX_PREVIEW;
+                    const globalStartIdx = findGlobalIndexByPhotoId(group.photos[0]?.id || 0);
+
+                    const showLocation = group.location && group.location !== lastLocation;
+                    if (group.location) lastLocation = group.location;
+
+                    return (
+                      <div key={`${group.date}-${group.location ?? "noloc"}-${group.uploader ?? "noupl"}-${groupIndex}`} className="space-y-1.5">
+                        {/* Lokasi & uploader sejajar ke samping */}
+                        {(showLocation || group.uploader) && (
+                          <div className="flex items-center gap-3 text-xs text-slate-500">
+                            {showLocation && (
+                              <span className="flex items-center gap-1">
+                                <MapPin className="h-3 w-3 text-emerald-500 shrink-0" />
+                                {group.location}
+                              </span>
+                            )}
+                            {group.uploader && (
+                              <span className="flex items-center gap-1">
+                                <User className="h-3 w-3 text-emerald-500 shrink-0" />
+                                {group.uploader}
+                              </span>
+                            )}
+                          </div>
                         )}
-                      </span>
-                      <span className="text-xs text-slate-500">{group.location}</span>
-                      <span className="flex items-center text-xs text-slate-500">
-                        {groupIndex === 0 && group.uploader && (
-                          <User className="h-3 w-3 text-emerald-500 shrink-0" />
-                        )}
-                      </span>
-                      <span className="text-xs text-slate-500">{group.uploader}</span>
 
-                      <div
-                        className="flex overflow-x-auto gap-3 pb-0 hide-scrollbar -mx-1 px-1"
-                        style={{ gridColumn: "1 / -1" }}
-                      >
-                        {photosToShow.map((photo, photoIndex) => {
-                          const isFirstPhoto = isFirstActivity && photoIndex === 0;
-                          return (
+                        <div className="flex overflow-x-auto gap-3 pb-2 hide-scrollbar -mx-1 px-1">
+                          {photosToShow.map((photo, photoIndex) => {
+                            const isFirstPhoto = isFirstActivity && photoIndex === 0;
+                            return (
+                              <motion.div
+                                key={photo.id}
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: photoIndex * 0.03, duration: 0.3 }}
+                                className={`shrink-0 cursor-pointer group relative ${selectMode ? "opacity-80" : ""}`}
+                                onClick={() => {
+                                  if (selectMode) togglePhotoSelect(photo.id);
+                                  else setLightboxIndex(globalStartIdx + photoIndex);
+                                }}
+                              >
+                                <div className="w-32 h-32 rounded-xl overflow-hidden border border-emerald-100 shadow-sm group-hover:shadow-md group-hover:border-emerald-300 transition-all relative">
+                                  <Image
+                                    src={photo.thumbnailUrl}
+                                    alt={photo.fileName || `Foto ${photoIndex + 1}`}
+                                    fill
+                                    sizes="128px"
+                                    className="object-cover group-hover:scale-105 transition-transform duration-300"
+                                    unoptimized
+                                    loading={isFirstPhoto ? "eager" : "lazy"}
+                                    priority={isFirstPhoto}
+                                  />
+                                  {selectMode && (
+                                    <div className="absolute top-1 right-1">
+                                      {selectedPhotos.includes(photo.id) ? (
+                                        <CheckSquare className="h-5 w-5 text-red-500 drop-shadow-md" />
+                                      ) : (
+                                        <Square className="h-5 w-5 text-white drop-shadow-md" />
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </motion.div>
+                            );
+                          })}
+
+                          {remaining > 0 && !selectMode && (
                             <motion.div
-                              key={photo.id}
-                              initial={{ opacity: 0, x: 20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: photoIndex * 0.03, duration: 0.3 }}
-                              className={`shrink-0 cursor-pointer group relative ${selectMode ? "opacity-80" : ""}`}
-                              onClick={() => {
-                                if (selectMode) togglePhotoSelect(photo.id);
-                                else setLightboxIndex(globalStartIdx + photoIndex);
-                              }}
+                              initial={{ opacity: 0, scale: 0.85 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              transition={{ delay: MAX_PREVIEW * 0.03 }}
+                              className="relative w-32 h-32 shrink-0 cursor-pointer group"
+                              onClick={() => setLightboxIndex(globalStartIdx + MAX_PREVIEW)}
                             >
-                              <div className="w-32 h-32 rounded-xl overflow-hidden border border-emerald-100 shadow-sm group-hover:shadow-md group-hover:border-emerald-300 transition-all relative">
+                              <div className="absolute inset-0 rounded-xl bg-emerald-100 border border-emerald-200 rotate-6 translate-x-1.5 translate-y-1" />
+                              <div className="absolute inset-0 rounded-xl bg-emerald-50 border border-emerald-200 -rotate-3 -translate-x-1" />
+                              <div className="absolute inset-0 rounded-xl overflow-hidden border border-emerald-200 shadow-md group-hover:shadow-lg transition-shadow">
                                 <Image
-                                  src={photo.thumbnailUrl}
-                                  alt={photo.fileName || `Foto ${photoIndex + 1}`}
+                                  src={group.photos[MAX_PREVIEW].thumbnailUrl}
+                                  alt="Foto lainnya"
                                   fill
                                   sizes="128px"
-                                  className="object-cover group-hover:scale-105 transition-transform duration-300"
+                                  className="object-cover"
                                   unoptimized
-                                  loading={isFirstPhoto ? "eager" : "lazy"}
-                                  priority={isFirstPhoto}
                                 />
-                                {selectMode && (
-                                  <div className="absolute top-1 right-1">
-                                    {selectedPhotos.includes(photo.id) ? (
-                                      <CheckSquare className="h-5 w-5 text-red-500 drop-shadow-md" />
-                                    ) : (
-                                      <Square className="h-5 w-5 text-white drop-shadow-md" />
-                                    )}
-                                  </div>
-                                )}
+                                <div className="absolute inset-0 bg-black/55 group-hover:bg-black/65 transition-colors flex flex-col items-center justify-center text-white">
+                                  <ImageIcon className="h-4 w-4 mb-1 opacity-90" />
+                                  <span className="text-lg font-bold leading-none">+{remaining}</span>
+                                  <span className="text-[10px] mt-0.5">foto lagi</span>
+                                </div>
                               </div>
                             </motion.div>
-                          );
-                        })}
-
-                        {remaining > 0 && !selectMode && (
-                          <motion.div
-                            initial={{ opacity: 0, scale: 0.85 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: MAX_PREVIEW * 0.03 }}
-                            className="relative w-32 h-32 shrink-0 cursor-pointer group"
-                            onClick={() => setLightboxIndex(globalStartIdx + MAX_PREVIEW)}
-                          >
-                            <div className="absolute inset-0 rounded-xl bg-emerald-100 border border-emerald-200 rotate-6 translate-x-1.5 translate-y-1" />
-                            <div className="absolute inset-0 rounded-xl bg-emerald-50 border border-emerald-200 -rotate-3 -translate-x-1" />
-                            <div className="absolute inset-0 rounded-xl overflow-hidden border border-emerald-200 shadow-md group-hover:shadow-lg transition-shadow">
-                              <Image
-                                src={group.photos[MAX_PREVIEW].thumbnailUrl}
-                                alt="Foto lainnya"
-                                fill
-                                sizes="128px"
-                                className="object-cover"
-                                unoptimized
-                              />
-                              <div className="absolute inset-0 bg-black/55 group-hover:bg-black/65 transition-colors flex flex-col items-center justify-center text-white">
-                                <ImageIcon className="h-4 w-4 mb-1 opacity-90" />
-                                <span className="text-lg font-bold leading-none">+{remaining}</span>
-                                <span className="text-[10px] mt-0.5">foto lagi</span>
-                              </div>
-                            </div>
-                          </motion.div>
-                        )}
+                          )}
+                        </div>
                       </div>
-                    </React.Fragment>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </motion.div>
 
