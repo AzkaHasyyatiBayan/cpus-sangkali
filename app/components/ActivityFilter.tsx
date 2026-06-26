@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import SuggestionInput from "@/app/components/SuggestionInput";
 
 interface ActivityFilterProps {
-  onFilterChange: (title: string, date: string, location: string, uploader: string) => void;
+  onFilterChange: (title: string, date: string, location: string, uploader: string, category: string) => void;
 }
 
 export default function ActivityFilter({ onFilterChange }: ActivityFilterProps) {
@@ -20,6 +20,7 @@ export default function ActivityFilter({ onFilterChange }: ActivityFilterProps) 
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [location, setLocation] = useState("");
   const [uploader, setUploader] = useState("");
+  const [category, setCategory] = useState(""); // "", "inside", "outside"
 
   const [availableTitles, setAvailableTitles] = useState<string[]>([]);
   const [availableLocations, setAvailableLocations] = useState<string[]>([]);
@@ -46,17 +47,18 @@ export default function ActivityFilter({ onFilterChange }: ActivityFilterProps) 
 
   useEffect(() => {
     const dateStr = date ? format(date, "yyyy-MM-dd") : "";
-    onFilterChange(title, dateStr, location, uploader);
-  }, [title, date, location, uploader, onFilterChange]);
+    onFilterChange(title, dateStr, location, uploader, category);
+  }, [title, date, location, uploader, category, onFilterChange]);
 
   const clearFilters = useCallback(() => {
     setTitle("");
     setDate(undefined);
     setLocation("");
     setUploader("");
+    setCategory("");
   }, []);
 
-  const hasActiveFilters = title || date || location || uploader;
+  const hasActiveFilters = title || date || location || uploader || category;
 
   return (
     <div className="bg-white rounded-xl border border-emerald-100 shadow-sm p-4 space-y-3">
@@ -112,12 +114,38 @@ export default function ActivityFilter({ onFilterChange }: ActivityFilterProps) 
         </div>
       </div>
 
+      {/* FILTER KATEGORI LOKASI */}
+      <div className="flex items-center gap-2 pt-1">
+        <span className="text-xs text-slate-500 font-medium">Kategori Lokasi:</span>
+        <div className="flex gap-1">
+          <button
+            onClick={() => setCategory("")}
+            className={`px-2 py-0.5 text-xs rounded-full transition-colors ${category === "" ? "bg-emerald-600 text-white" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"}`}
+          >
+            Semua
+          </button>
+          <button
+            onClick={() => setCategory("inside")}
+            className={`px-2 py-0.5 text-xs rounded-full transition-colors ${category === "inside" ? "bg-emerald-600 text-white" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"}`}
+          >
+            Dalam Gedung
+          </button>
+          <button
+            onClick={() => setCategory("outside")}
+            className={`px-2 py-0.5 text-xs rounded-full transition-colors ${category === "outside" ? "bg-emerald-600 text-white" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"}`}
+          >
+            Luar Gedung
+          </button>
+        </div>
+      </div>
+
       {hasActiveFilters && (
         <div className="flex flex-wrap gap-2 pt-1">
           {title && <Badge variant="secondary">{title}<button onClick={() => setTitle("")}><X className="h-3 w-3 ml-1" /></button></Badge>}
           {location && <Badge variant="secondary">{location}<button onClick={() => setLocation("")}><X className="h-3 w-3 ml-1" /></button></Badge>}
           {uploader && <Badge variant="secondary">{uploader}<button onClick={() => setUploader("")}><X className="h-3 w-3 ml-1" /></button></Badge>}
           {date && <Badge variant="secondary">{format(date, "dd MMM yyyy", { locale: id })}<button onClick={() => setDate(undefined)}><X className="h-3 w-3 ml-1" /></button></Badge>}
+          {category && <Badge variant="secondary">{category === "inside" ? "Dalam Gedung" : "Luar Gedung"}<button onClick={() => setCategory("")}><X className="h-3 w-3 ml-1" /></button></Badge>}
         </div>
       )}
     </div>

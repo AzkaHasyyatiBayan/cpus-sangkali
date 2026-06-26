@@ -1,3 +1,5 @@
+// app/api/upload/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { activities, photos } from "@/lib/schema";
@@ -14,6 +16,7 @@ export async function POST(request: NextRequest) {
     const description = formData.get("description") as string | null;
     const location = formData.get("location") as string | null;
     const uploader = formData.get("uploader") as string | null;
+    const category = formData.get("category") as string | null;
 
     if (!file || !title || !activityDate) {
       return NextResponse.json(
@@ -43,27 +46,27 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(arrayBuffer);
     const fileSize = buffer.length;
 
-    // Upload ke Cloudinary (penyimpanan utama)
+    // Upload ke Cloudinary
     console.log("🔵 Upload ke Cloudinary...");
+    
     const driveFileId = await uploadToGoogleDrive(
       buffer,
       `${title}_${Date.now()}_${file.name}`
     );
     console.log("🔵 Cloudinary OK:", driveFileId);
 
-    // Nama file custom untuk backup GDrive
+    // Nama file backup
     const safeTitle = title.trim().replace(/[^a-zA-Z0-9]/g, "_");
     const safeLocation = (location || "tanpa-lokasi").trim().replace(/[^a-zA-Z0-9]/g, "_");
     const safeUploader = (uploader || "tanpa-pengupload").trim().replace(/[^a-zA-Z0-9]/g, "_");
     const backupFileName = `${activityDate}_${safeTitle}_${safeLocation}_${safeUploader}_${Date.now()}`;
 
-    // Backup ke Google Drive (konversi ke JPG)
+    // Backup ke Google Drive
     console.log("🟡 Mulai backup ke Google Drive...");
     try {
       const { uploadBackupToGoogleDrive } = await import("@/lib/googleDrive");
       console.log("🟡 Import OK, konversi ke JPG...");
 
-      // Konversi buffer ke JPG
       const sharp = (await import("sharp")).default;
       const jpgBuffer = await sharp(buffer)
         .jpeg({ quality: 85 })
@@ -77,6 +80,7 @@ export async function POST(request: NextRequest) {
       console.error("🔴 Backup ke Google Drive gagal:", e);
     }
 
+    // Cari atau buat activity
     let [activity] = await db
       .select()
       .from(activities)
@@ -91,6 +95,7 @@ export async function POST(request: NextRequest) {
           description: description?.trim() || null,
           location: location?.trim() || null,
           uploader: uploader?.trim() || null,
+          category: category || null, 
         })
         .returning();
     } else {
@@ -98,6 +103,7 @@ export async function POST(request: NextRequest) {
       if (description?.trim() && !activity.description) changed.description = description.trim();
       if (location?.trim() && !activity.location) changed.location = location.trim();
       if (uploader?.trim() && !activity.uploader) changed.uploader = uploader.trim();
+      if (category && !activity.category) changed.category = category.trim();
       if (Object.keys(changed).length > 0) {
         [activity] = await db
           .update(activities)

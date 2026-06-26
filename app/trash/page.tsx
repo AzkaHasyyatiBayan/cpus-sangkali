@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
-import { Trash2, RefreshCw, Undo2, AlertTriangle, CheckSquare, Square, MapPin, User } from "lucide-react";
+import Link from "next/link";
+import { Trash2, RefreshCw, Undo2, AlertTriangle, CheckSquare, Square, MapPin, User, ArrowLeft } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import Image from "next/image";
 
@@ -98,10 +99,18 @@ export default function TrashPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Header — responsif */}
+      {/* Header */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-red-100 shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 min-w-0">
+            {/* Tombol kembali ke gallery */}
+            <Link
+              href="/gallery"
+              className="text-slate-400 hover:text-emerald-600 transition-colors shrink-0"
+              title="Kembali ke Galeri"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
             <Trash2 className="h-6 w-6 text-red-500 shrink-0" />
             <div className="min-w-0">
               <h1 className="text-lg font-bold text-red-700 truncate">Tempat Sampah</h1>
@@ -196,7 +205,7 @@ export default function TrashPage() {
                       </span>
                     )}
                     {photo.uploader && (
-                      <span className="text-xs text-slate-400 flex items-center gap-1 truncate max-w-">37.5
+                      <span className="text-xs text-slate-400 flex items-center gap-1 truncate max-w-37.5">
                         <User className="h-3 w-3 text-slate-400 shrink-0" />
                         <span className="truncate">{photo.uploader}</span>
                       </span>

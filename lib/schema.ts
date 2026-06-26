@@ -5,7 +5,8 @@ export const activities = pgTable("activities", {
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
   location: text("location"),                
-  uploader: text("uploader"),                
+  uploader: text("uploader"),         
+  category: text("category"),       
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

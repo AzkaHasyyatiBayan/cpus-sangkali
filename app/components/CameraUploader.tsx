@@ -24,6 +24,7 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
   const [uploader, setUploader] = useState("");
+  const [category, setCategory] = useState("outside"); // "inside" atau "outside"
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -95,7 +96,7 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
           new Compressor(files[i], {
             maxWidth: 1600,
             maxHeight: 1600,
-            quality: 0.6, // Kompresi lebih agresif
+            quality: 0.6,
             mimeType: "image/webp",
             success(result) { resolve(result as File); },
             error(err) { reject(err); },
@@ -109,6 +110,7 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
         formData.append("description", description.trim());
         formData.append("location", location.trim());
         formData.append("uploader", uploader.trim());
+        formData.append("category", category); // <-- Kirim kategori
 
         const response = await fetch("/api/upload", {
           method: "POST",
@@ -143,6 +145,7 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
     setDescription("");
     setLocation("");
     setUploader("");
+    setCategory("outside");
     setFiles([]);
     setPreviews([]);
     setUploadProgress(0);
@@ -254,6 +257,23 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
                         placeholder="Ketik atau pilih pengupload..."
                         icon={<User className="h-4 w-4" />}
                       />
+                    </div>
+
+                    {/* ===== TAMBAHAN: KATEGORI LOKASI ===== */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        Kategori Lokasi <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={category}
+                        onChange={(e) => setCategory(e.target.value)}
+                        disabled={isUploading}
+                        className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <option value="inside">Dalam Gedung</option>
+                        <option value="outside">Luar Gedung</option>
+                      </select>
+                      <p className="text-xs text-slate-400 mt-1">Pilih apakah kegiatan dilaksanakan di dalam atau di luar gedung</p>
                     </div>
 
                     {/* Deskripsi */}

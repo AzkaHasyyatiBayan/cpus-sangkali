@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get("date");
     const location = searchParams.get("location");
     const uploader = searchParams.get("uploader");
+    const category = searchParams.get("category"); 
     const includeDeleted = searchParams.get("includeDeleted") === "true";
 
     const conditions = [];
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest) {
     if (date) conditions.push(eq(photos.activityDate, date));
     if (location) conditions.push(ilike(photos.location, `%${location}%`));
     if (uploader) conditions.push(ilike(photos.uploader, `%${uploader}%`));
-    
+    if (category) conditions.push(eq(activities.category, category));
     // Filter foto yang belum dihapus (kecuali includeDeleted=true untuk halaman trash)
     if (!includeDeleted) {
       conditions.push(isNull(photos.deletedAt));
@@ -64,6 +65,7 @@ export async function GET(request: NextRequest) {
         description: string | null;
         location: string | null;
         uploader: string | null;
+        category: string | null;
         groupsMap: Map<string, PhotoGroup>;
       }
     >();
@@ -79,6 +81,7 @@ export async function GET(request: NextRequest) {
           description: act.description,
           location: act.location,
           uploader: act.uploader,
+          category: act.category,
           groupsMap: new Map(),
         });
       }
@@ -113,6 +116,7 @@ export async function GET(request: NextRequest) {
         description: act.description,
         location: act.location,
         uploader: act.uploader,
+        category: act.category,
         dates: Array.from(act.groupsMap.values()).sort(
           (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
         ),

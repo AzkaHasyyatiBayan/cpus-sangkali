@@ -33,6 +33,7 @@ export interface Activity {
   description: string | null;
   location: string | null;
   uploader: string | null;
+  category?: string | null;
   dates: DateGroup[];
 }
 
@@ -196,7 +197,23 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity }: Pho
         <div className="px-4 py-3 border-b border-emerald-50 bg-linear-to-r from-emerald-50/50 to-white">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-emerald-800 text-base">{activity.title}</h3>
+              {/* --- PERUBAHAN DI SINI: tambahkan badge kategori --- */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-semibold text-emerald-800 text-base">{activity.title}</h3>
+                {activity.category && (
+                  <Badge
+                    variant="secondary"
+                    className={`text-xs px-2 py-0.5 ${
+                      activity.category === "inside"
+                        ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                        : "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                    }`}
+                  >
+                    {activity.category === "inside" ? "Dalam Gedung" : "Luar Gedung"}
+                  </Badge>
+                )}
+              </div>
+              {/* --- AKHIR PERUBAHAN --- */}
 
               {/* Preview info: sesi | foto | [lokasi kolom] | [uploader kolom] */}
               <div className="flex flex-wrap items-start gap-x-3 gap-y-0.5 mt-1.5 text-xs text-slate-500">
