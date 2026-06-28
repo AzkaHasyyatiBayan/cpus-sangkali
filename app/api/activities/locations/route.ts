@@ -1,11 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { activities, photos } from "@/lib/schema";
-import { DEFAULT_LOCATIONS } from "@/lib/constants";
+import { DEFAULT_LOCATIONS, filterLocationsByCategory } from "@/lib/constants";
 import { sql } from "drizzle-orm";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const category = searchParams.get("category") || "";
+
     const photoLocations = await db
       .select({ location: photos.location })
       .from(photos)
@@ -23,7 +26,7 @@ export async function GET() {
       .filter(Boolean);
 
     const seen = new Set<string>();
-    const unique: string[] = [];
+    let unique: string[] = [];
     [...dbStrings, ...DEFAULT_LOCATIONS].forEach((loc) => {
       const norm = loc.trim().toLowerCase();
       if (!seen.has(norm)) {
@@ -31,6 +34,12 @@ export async function GET() {
         unique.push(loc.trim());
       }
     });
+
+    // Filter berdasarkan category jika ada
+    if (category && category !== "all" && category !== "") {
+      unique = filterLocationsByCategory(unique, category);
+    }
+
     unique.sort((a, b) => a.localeCompare(b, "id"));
     return NextResponse.json({ success: true, data: unique });
   } catch (error: unknown) {

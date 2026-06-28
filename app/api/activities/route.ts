@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { activities, photos } from "@/lib/schema";
 import { eq, and, desc, ilike, isNull } from "drizzle-orm";
+import { isInsideBuildingActivity } from "@/lib/constants";
 
 interface PhotoItem {
   id: number;
@@ -18,6 +19,11 @@ interface PhotoGroup {
   location: string | null;
   uploader: string | null;
   photos: PhotoItem[];
+}
+
+// Normalize title untuk deduplication
+function normalizeTitle(title: string): string {
+  return title.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 export async function GET(request: NextRequest) {
@@ -37,7 +43,7 @@ export async function GET(request: NextRequest) {
     if (date) conditions.push(eq(photos.activityDate, date));
     if (location) conditions.push(ilike(photos.location, `%${location}%`));
     if (uploader) conditions.push(ilike(photos.uploader, `%${uploader}%`));
-    if (category) conditions.push(eq(activities.category, category));
+    
     // Filter foto yang belum dihapus (kecuali includeDeleted=true untuk halaman trash)
     if (!includeDeleted) {
       conditions.push(isNull(photos.deletedAt));
@@ -55,17 +61,20 @@ export async function GET(request: NextRequest) {
       .where(whereClause)
       .orderBy(desc(activities.createdAt), desc(photos.activityDate), desc(photos.createdAt));
 
+    console.log(`[Activities API] Total rows from DB: ${results.length}`);
+
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
 
+    // Gunakan Map dengan normalized title sebagai key untuk deduplication
     const activityMap = new Map<
-      number,
+      string, // normalized title sebagai key
       {
         id: number;
         title: string;
         description: string | null;
         location: string | null;
         uploader: string | null;
-        category: string | null;
+        category: string;
         groupsMap: Map<string, PhotoGroup>;
       }
     >();
@@ -74,20 +83,33 @@ export async function GET(request: NextRequest) {
       const act = row.activity;
       const photo = row.photo;
 
-      if (!activityMap.has(act.id)) {
-        activityMap.set(act.id, {
+      const computedCategory = isInsideBuildingActivity(act.title) ? "inside" : "outside";
+
+      // Filter category berdasarkan perhitungan
+      if (category && category !== "all" && category !== "") {
+        if (computedCategory !== category) {
+          continue; // Skip activity ini karena tidak match category
+        }
+      }
+
+      // Normalize title untuk deduplication
+      const normalizedTitle = normalizeTitle(act.title);
+
+      // Jika activity dengan title yang sama (case-insensitive) sudah ada, gabungkan photos-nya
+      if (!activityMap.has(normalizedTitle)) {
+        activityMap.set(normalizedTitle, {
           id: act.id,
           title: act.title,
           description: act.description,
           location: act.location,
           uploader: act.uploader,
-          category: act.category,
+          category: computedCategory,
           groupsMap: new Map(),
         });
       }
 
       if (photo) {
-        const entry = activityMap.get(act.id)!;
+        const entry = activityMap.get(normalizedTitle)!;
         const groupKey = `${photo.activityDate}__${photo.location ?? ""}__${photo.uploader ?? ""}`;
         if (!entry.groupsMap.has(groupKey)) {
           entry.groupsMap.set(groupKey, {
@@ -97,15 +119,22 @@ export async function GET(request: NextRequest) {
             photos: [],
           });
         }
-        entry.groupsMap.get(groupKey)!.photos.push({
-          id: photo.id,
-          driveFileId: photo.driveFileId,
-          fileName: photo.fileName,
-          mimeType: photo.mimeType,
-          activityDate: photo.activityDate,
-          thumbnailUrl: `https://res.cloudinary.com/${cloudName}/image/upload/w_400,c_fill/${photo.driveFileId}`,
-          fullUrl: `https://res.cloudinary.com/${cloudName}/image/upload/${photo.driveFileId}`,
-        });
+        
+        // Cek apakah photo ini sudah ada (hindari duplikat photo)
+        const existingPhotos = entry.groupsMap.get(groupKey)!.photos;
+        const photoExists = existingPhotos.some(p => p.id === photo.id);
+        
+        if (!photoExists) {
+          existingPhotos.push({
+            id: photo.id,
+            driveFileId: photo.driveFileId,
+            fileName: photo.fileName,
+            mimeType: photo.mimeType,
+            activityDate: photo.activityDate,
+            thumbnailUrl: `https://res.cloudinary.com/${cloudName}/image/upload/w_400,c_fill/${photo.driveFileId}`,
+            fullUrl: `https://res.cloudinary.com/${cloudName}/image/upload/${photo.driveFileId}`,
+          });
+        }
       }
     }
 
@@ -126,6 +155,12 @@ export async function GET(request: NextRequest) {
         const bDate = b.dates[0]?.date || "";
         return new Date(bDate).getTime() - new Date(aDate).getTime();
       });
+
+    // Logging untuk debug
+    console.log(`[Activities API] Category filter: ${category || "none"}, Total activities: ${activityList.length}`);
+    if (category && category !== "all" && category !== "") {
+      console.log(`[Activities API] Activities:`, activityList.map(a => ({ title: a.title, category: a.category })));
+    }
 
     return NextResponse.json({ success: true, data: activityList });
   } catch (error: unknown) {

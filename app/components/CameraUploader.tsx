@@ -3,14 +3,14 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
   Camera, Upload, X, Loader2, CheckCircle, Image as ImageIcon,
-  MapPin, User, Search
+  MapPin, User, Search, Building2, TreePine,
 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import Compressor from "compressorjs";
-import { MAX_DESCRIPTION_WORDS } from "@/lib/constants";
+import { MAX_DESCRIPTION_WORDS, getDefaultLocationForActivity } from "@/lib/constants";
 import SuggestionInput from "@/app/components/SuggestionInput";
 
 interface CameraUploaderProps {
@@ -24,7 +24,7 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
   const [uploader, setUploader] = useState("");
-  const [category, setCategory] = useState("outside"); // "inside" atau "outside"
+  const [category, setCategory] = useState("outside");
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -41,24 +41,44 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
   const wordCount = description.trim() ? description.trim().split(/\s+/).filter(Boolean).length : 0;
   const isOverLimit = wordCount > MAX_DESCRIPTION_WORDS;
 
-  useEffect(() => {
-    if (isOpen) {
-      fetch("/api/activities/titles")
-        .then((r) => r.json())
-        .then((d) => { if (d.success) setTitleSuggestions(d.data); })
-        .catch(console.error);
-
-      fetch("/api/activities/locations")
-        .then((r) => r.json())
-        .then((d) => { if (d.success) setLocationSuggestions(d.data); })
-        .catch(console.error);
-
-      fetch("/api/activities/uploaders")
-        .then((r) => r.json())
-        .then((d) => { if (d.success) setUploaderSuggestions(d.data); })
-        .catch(console.error);
+  const handleTitleChange = (newTitle: string) => {
+    setTitle(newTitle);
+    // Auto-fill lokasi hanya jika lokasi masih kosong
+    if (!location.trim()) {
+      const suggestedLocation = getDefaultLocationForActivity(newTitle);
+      if (suggestedLocation) {
+        setLocation(suggestedLocation);
+      }
     }
-  }, [isOpen]);
+  };
+
+  // Fetch suggestions saat modal terbuka ATAU category berubah
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Fetch titles dengan filter category
+    const titleParams = new URLSearchParams();
+    if (category) titleParams.set("category", category);
+    
+    fetch(`/api/activities/titles?${titleParams.toString()}`)
+      .then((r) => r.json())
+      .then((d) => { if (d.success) setTitleSuggestions(d.data); })
+      .catch(console.error);
+
+    // Fetch locations dengan filter category
+    const locationParams = new URLSearchParams();
+    if (category) locationParams.set("category", category);
+    
+    fetch(`/api/activities/locations?${locationParams.toString()}`)
+      .then((r) => r.json())
+      .then((d) => { if (d.success) setLocationSuggestions(d.data); })
+      .catch(console.error);
+
+    fetch("/api/activities/uploaders")
+      .then((r) => r.json())
+      .then((d) => { if (d.success) setUploaderSuggestions(d.data); })
+      .catch(console.error);
+  }, [isOpen, category]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
@@ -110,7 +130,7 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
         formData.append("description", description.trim());
         formData.append("location", location.trim());
         formData.append("uploader", uploader.trim());
-        formData.append("category", category); // <-- Kirim kategori
+        formData.append("category", category);
 
         const response = await fetch("/api/upload", {
           method: "POST",
@@ -158,9 +178,9 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-40 h-14 w-14 rounded-full bg-emerald-600 text-white shadow-lg shadow-emerald-200 flex items-center justify-center hover:bg-emerald-700 transition-colors"
+        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-emerald-600 text-white shadow-lg shadow-emerald-200 flex items-center justify-center hover:bg-emerald-700 transition-colors"
       >
-        <Camera className="h-6 w-6" />
+        <Camera className="h-5 w-5 sm:h-6 sm:w-6" />
       </motion.button>
 
       <AnimatePresence>
@@ -169,7 +189,7 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4"
             onClick={(e) => e.target === e.currentTarget && !isUploading && resetForm()}
           >
             <motion.div
@@ -177,10 +197,11 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 100, opacity: 0 }}
               transition={{ type: "spring", damping: 25 }}
-              className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
+              className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl overflow-hidden max-h-[95vh] sm:max-h-[90vh] flex flex-col"
             >
-              <div className="bg-linear-to-r from-emerald-600 to-emerald-700 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
-                <h2 className="text-white font-semibold text-lg">
+              {/* Header - sticky */}
+              <div className="bg-linear-to-r from-emerald-600 to-emerald-700 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between shrink-0">
+                <h2 className="text-white font-semibold text-base sm:text-lg">
                   {uploadSuccess ? "Berhasil!" : "Unggah Foto"}
                 </h2>
                 {!isUploading && !uploadSuccess && (
@@ -190,7 +211,8 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
                 )}
               </div>
 
-              <div className="p-6 space-y-4">
+              {/* Content - scrollable */}
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
                 {uploadSuccess ? (
                   <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="flex flex-col items-center py-8">
                     <CheckCircle className="h-16 w-16 text-emerald-500 mb-4" />
@@ -199,20 +221,63 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
                   </motion.div>
                 ) : (
                   <>
-                    {/* Judul */}
+                    {/* Kategori Lokasi */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Kategori Lokasi <span className="text-red-500">*</span>
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setCategory("inside")}
+                          className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border-2 transition-all text-sm font-medium ${
+                            category === "inside"
+                              ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                              : "border-slate-200 bg-white text-slate-600 hover:border-emerald-300"
+                          }`}
+                          disabled={isUploading}
+                        >
+                          <Building2 className="h-4 w-4" />
+                          <span>Dalam Gedung</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCategory("outside")}
+                          className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border-2 transition-all text-sm font-medium ${
+                            category === "outside"
+                              ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                              : "border-slate-200 bg-white text-slate-600 hover:border-emerald-300"
+                          }`}
+                          disabled={isUploading}
+                        >
+                          <TreePine className="h-4 w-4" />
+                          <span>Luar Gedung</span>
+                        </button>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1.5">
+                        {category === "inside" 
+                          ? "Kegiatan di dalam gedung puskesmas (pelayanan, lab, dll)" 
+                          : "Kegiatan di luar gedung (posyandu, kunjungan, dll)"}
+                      </p>
+                    </div>
+
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">
                         Judul Kegiatan <span className="text-red-500">*</span>
                       </label>
                       <SuggestionInput
                         value={title}
-                        onChange={setTitle}
+                        onChange={handleTitleChange}
                         suggestions={titleSuggestions}
                         disabled={isUploading}
                         placeholder="Ketik atau pilih kegiatan..."
                         icon={<Search className="h-4 w-4" />}
                       />
-                      <p className="text-xs text-slate-400 mt-1">Pilih dari daftar atau ketik nama baru</p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        {titleSuggestions.length > 0 
+                          ? `${titleSuggestions.length} kegiatan tersedia untuk kategori ini`
+                          : "Pilih dari daftar atau ketik nama baru"}
+                      </p>
                     </div>
 
                     {/* Tanggal */}
@@ -259,23 +324,6 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
                       />
                     </div>
 
-                    {/* ===== TAMBAHAN: KATEGORI LOKASI ===== */}
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                        Kategori Lokasi <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={category}
-                        onChange={(e) => setCategory(e.target.value)}
-                        disabled={isUploading}
-                        className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <option value="inside">Dalam Gedung</option>
-                        <option value="outside">Luar Gedung</option>
-                      </select>
-                      <p className="text-xs text-slate-400 mt-1">Pilih apakah kegiatan dilaksanakan di dalam atau di luar gedung</p>
-                    </div>
-
                     {/* Deskripsi */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">
@@ -308,22 +356,22 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
                           onClick={() => cameraInputRef.current?.click()}
                           disabled={isUploading}
                           variant="outline"
-                          className="h-20 flex-col gap-1 border-emerald-200 hover:bg-emerald-50 hover:border-emerald-400"
+                          className="h-16 sm:h-20 flex-col gap-1 border-emerald-200 hover:bg-emerald-50 hover:border-emerald-400"
                         >
                           <Camera className="h-5 w-5 text-emerald-600" />
                           <span className="text-xs font-medium">Ambil Foto</span>
-                          <span className="text-[10px] text-slate-400">Dari kamera</span>
+                          <span className="text-[10px] text-slate-400 hidden sm:block">Dari kamera</span>
                         </Button>
                         <Button
                           type="button"
                           onClick={() => galleryInputRef.current?.click()}
                           disabled={isUploading}
                           variant="outline"
-                          className="h-20 flex-col gap-1 border-emerald-200 hover:bg-emerald-50 hover:border-emerald-400"
+                          className="h-16 sm:h-20 flex-col gap-1 border-emerald-200 hover:bg-emerald-50 hover:border-emerald-400"
                         >
                           <ImageIcon className="h-5 w-5 text-emerald-600" />
                           <span className="text-xs font-medium">Pilih dari Galeri</span>
-                          <span className="text-[10px] text-slate-400">Foto yang sudah ada</span>
+                          <span className="text-[10px] text-slate-400 hidden sm:block">Foto yang sudah ada</span>
                         </Button>
                       </div>
                       <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileChange} className="hidden" disabled={isUploading} />
@@ -373,7 +421,7 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
                     <Button
                       onClick={handleUpload}
                       disabled={isUploading || files.length === 0 || !title.trim() || isOverLimit}
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-12 text-base font-medium"
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-11 sm:h-12 text-sm sm:text-base font-medium"
                     >
                       {isUploading ? (
                         <><Loader2 className="h-5 w-5 mr-2 animate-spin" /> Mengunggah...</>

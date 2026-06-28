@@ -25,7 +25,7 @@ export default function GalleryPage() {
     date: "",
     location: "",
     uploader: "",
-    category: "", // <-- tambahan
+    category: "",
   });
   const [refreshing, setRefreshing] = useState(false);
   const [storage, setStorage] = useState<StorageInfo | null>(null);
@@ -95,7 +95,6 @@ export default function GalleryPage() {
     load();
   }, [fetchActivities, fetchStorage, fetchGDriveStorage]);
 
-  // 🔁 handleFilterChange sekarang menerima 5 parameter (title, date, location, uploader, category)
   const handleFilterChange = useCallback(
     (title: string, date: string, location: string, uploader: string, category: string) => {
       setFilters({ title, date, location, uploader, category });
@@ -144,60 +143,63 @@ export default function GalleryPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      {/* Header - Responsive */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-emerald-100 shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Camera className="h-6 w-6 text-emerald-600" strokeWidth={1.5} />
-            <div>
-              <h1 className="text-lg font-bold text-emerald-800 leading-tight tracking-tight">CPUS Sangkali</h1>
-              <p className="text-xs text-slate-500">Galeri Foto Kegiatan</p>
+        <div className="max-w-4xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-2">
+          {/* Logo & Title */}
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <Camera className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600 shrink-0" strokeWidth={1.5} />
+            <div className="min-w-0">
+              <h1 className="text-sm sm:text-lg font-bold text-emerald-800 leading-tight tracking-tight truncate">CPUS Sangkali</h1>
+              <p className="text-[10px] sm:text-xs text-slate-500 truncate">Galeri Foto Kegiatan</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          
+          {/* Actions */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <a
               href="/trash"
-              className="flex items-center gap-1 text-xs text-slate-500 hover:text-red-500 transition-colors bg-slate-100 hover:bg-red-50 px-2.5 py-1 rounded-full"
+              className="flex items-center gap-1 text-xs text-slate-500 hover:text-red-500 transition-colors bg-slate-100 hover:bg-red-50 px-2 py-1.5 rounded-full"
               title="Tempat Sampah"
             >
-              <Trash2 className="h-3 w-3" />
+              <Trash2 className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Trash</span>
             </a>
 
             {storage && (
-              <div className="flex items-center text-xs text-white bg-emerald-600 px-2.5 py-1 rounded-full shadow-sm">
-                <HardDrive className="h-3 w-3 mr-1.5" />
+              <div className="flex items-center text-xs text-white bg-emerald-600 px-2 py-1.5 rounded-full shadow-sm">
+                <HardDrive className="h-3 w-3 mr-1" />
                 <span className="hidden sm:inline">{formatBytes(storage.used)} / {formatBytes(storage.limit)}</span>
-                <span className="sm:hidden">{storage.percent.toFixed(1)}%</span>
-                {storage.percent > 80 && (
-                  <span className="ml-1 text-amber-200 font-medium">({storage.percent.toFixed(1)}%)</span>
-                )}
+                <span className="sm:hidden">{storage.percent.toFixed(0)}%</span>
               </div>
             )}
+            
             <Button 
               variant="ghost" 
               size="icon" 
               onClick={handleRefresh} 
               disabled={refreshing} 
-              className="text-emerald-600 hover:bg-emerald-50"
+              className="text-emerald-600 hover:bg-emerald-50 h-8 w-8 sm:h-9 sm:w-9"
             >
-              <RefreshCw className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} />
+              <RefreshCw className={`h-4 w-4 sm:h-5 sm:w-5 ${refreshing ? "animate-spin" : ""}`} />
             </Button>
           </div>
         </div>
 
+        {/* Warning banners - responsive text */}
         {isNearLimit && (
-          <div className="bg-red-50 border-t border-red-200 px-4 py-2 text-sm text-red-700 flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-red-500" />
+          <div className="bg-red-50 border-t border-red-200 px-3 sm:px-4 py-2 text-xs sm:text-sm text-red-700 flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" />
             <span>Penyimpanan hampir penuh ({storage!.percent.toFixed(1)}%). Disarankan menghapus sekitar <strong>{formatBytes(recommendedDeleteBytes)}</strong> foto.</span>
           </div>
         )}
 
         {isGDriveNearLimit && gdriveStorage && (
-          <div className={`border-t px-4 py-2 text-sm flex items-center gap-2 ${isGDriveFull ? "bg-red-50 border-red-200 text-red-700" : "bg-amber-50 border-amber-200 text-amber-700"}`}>
-            <HardDrive className={`h-4 w-4 ${isGDriveFull ? "text-red-500" : "text-amber-500"}`} />
+          <div className={`border-t px-3 sm:px-4 py-2 text-xs sm:text-sm flex items-center gap-2 ${isGDriveFull ? "bg-red-50 border-red-200 text-red-700" : "bg-amber-50 border-amber-200 text-amber-700"}`}>
+            <HardDrive className={`h-4 w-4 shrink-0 ${isGDriveFull ? "text-red-500" : "text-amber-500"}`} />
             <span>
               {isGDriveFull 
-                ? `Google Drive backup PENUH! (${gdriveStorage.percent.toFixed(1)}%). Segera hapus file lama di Google Drive.`
+                ? `Google Drive backup PENUH! (${gdriveStorage.percent.toFixed(1)}%). Segera hapus file lama.`
                 : `Google Drive backup tersisa ${formatBytes(gdriveStorage.limit - gdriveStorage.used)} (${gdriveStorage.percent.toFixed(1)}% terpakai)`
               }
             </span>
@@ -205,50 +207,55 @@ export default function GalleryPage() {
         )}
 
         {tokenExpired && !dismissToken && (
-          <div className="bg-blue-50 border-t border-blue-200 px-4 py-2 text-sm text-blue-700 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
+          <div className="bg-blue-50 border-t border-blue-200 px-3 sm:px-4 py-2 text-xs sm:text-sm text-blue-700 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               <Wrench className="h-4 w-4 text-blue-500 shrink-0" />
-              <span>Token Google Drive expired. Backup tidak berjalan. <a href="/setup-backup" className="underline font-medium">Setup ulang di sini</a></span>
+              <span className="truncate">Token Google Drive expired. <a href="/setup-backup" className="underline font-medium">Setup ulang</a></span>
             </div>
             <button onClick={handleDismissToken} className="text-blue-400 hover:text-blue-600 shrink-0 text-xs">Nanti</button>
           </div>
         )}
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-6 space-y-6 pb-24">
-        {/* 🔁 ActivityFilter sekarang mengirim 5 parameter, dan kita siap menerimanya */}
+      {/* Main Content - Responsive padding */}
+      <main className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6 pb-20 sm:pb-24">
         <ActivityFilter onFilterChange={handleFilterChange} />
 
+        {/* Stats - responsive */}
         {!loading && filteredActivities.length > 0 && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between text-sm text-slate-500">
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between text-xs sm:text-sm text-slate-500">
             <span>Menampilkan <strong className="text-emerald-700">{filteredActivities.length}</strong> kegiatan</span>
             <span>Total <strong className="text-emerald-700">{totalPhotos}</strong> foto</span>
           </motion.div>
         )}
 
+        {/* Loading skeleton */}
         {loading && (
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white rounded-xl border border-emerald-100 p-4 animate-pulse">
+              <div key={i} className="bg-white rounded-xl border border-emerald-100 p-3 sm:p-4 animate-pulse">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="h-5 w-40 bg-emerald-100 rounded" />
-                  <div className="h-4 w-24 bg-emerald-50 rounded" />
+                  <div className="h-5 w-32 sm:w-40 bg-emerald-100 rounded" />
+                  <div className="h-4 w-20 sm:w-24 bg-emerald-50 rounded" />
                 </div>
-                <div className="flex gap-3">
-                  {[1, 2, 3, 4, 5].map((j) => (<div key={j} className="w-32 h-32 bg-emerald-50 rounded-xl skeleton" />))}
+                <div className="flex gap-2 sm:gap-3">
+                  {[1, 2, 3, 4].map((j) => (
+                    <div key={j} className="w-24 h-24 sm:w-32 sm:h-32 bg-emerald-50 rounded-xl skeleton" />
+                  ))}
                 </div>
               </div>
             ))}
           </div>
         )}
 
+        {/* Empty state */}
         {!loading && filteredActivities.length === 0 && (
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="h-20 w-20 rounded-full bg-emerald-50 flex items-center justify-center mb-4">
-              <FolderOpen className="h-10 w-10 text-emerald-300" />
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center justify-center py-12 sm:py-16 text-center px-4">
+            <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-full bg-emerald-50 flex items-center justify-center mb-4">
+              <FolderOpen className="h-8 w-8 sm:h-10 sm:w-10 text-emerald-300" />
             </div>
-            <h3 className="text-lg font-semibold text-emerald-800 mb-1">Belum Ada Kegiatan</h3>
-            <p className="text-slate-500 text-sm max-w-xs">
+            <h3 className="text-base sm:text-lg font-semibold text-emerald-800 mb-1">Belum Ada Kegiatan</h3>
+            <p className="text-slate-500 text-xs sm:text-sm max-w-xs">
               {filters.title || filters.date || filters.location || filters.uploader || filters.category
                 ? "Tidak ada kegiatan yang cocok dengan filter Anda."
                 : "Mulai dengan mengunggah foto kegiatan pertama Anda."}
@@ -256,8 +263,9 @@ export default function GalleryPage() {
           </motion.div>
         )}
 
+        {/* Activities list */}
         {!loading && (
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             <AnimatePresence mode="popLayout">
               {filteredActivities.map((activity, index) => (
                 <PhotoStack
