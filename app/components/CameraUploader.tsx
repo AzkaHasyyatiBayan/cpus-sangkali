@@ -201,15 +201,18 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
             >
               {/* Header - sticky */}
               <div className="bg-linear-to-r from-emerald-600 to-emerald-700 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between shrink-0">
-                <h2 className="text-white font-semibold text-base sm:text-lg">
+                <h2 className="text-white font-semibold text-sm sm:text-lg truncate pr-2">
                   {uploadSuccess ? "Berhasil!" : "Unggah Foto"}
                 </h2>
                 {!isUploading && !uploadSuccess && (
-                  <button onClick={resetForm} className="text-white/80 hover:text-white transition-colors">
+                  <button onClick={resetForm} className="text-white/80 hover:text-white transition-colors shrink-0 p-1 -mr-1">
                     <X className="h-5 w-5" />
                   </button>
                 )}
               </div>
+
+              {/* Content - scrollable */}
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1"></div>
 
               {/* Content - scrollable */}
               <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
