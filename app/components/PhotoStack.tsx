@@ -18,6 +18,7 @@ interface Photo {
   thumbnailUrl: string;
   fullUrl: string;
   activityDate: string;
+  createdAt?: string;
 }
 
 interface DateGroup {
