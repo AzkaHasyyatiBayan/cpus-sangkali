@@ -1,10 +1,11 @@
-// app/page.tsx
-
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Camera, FolderOpen, RefreshCw, HardDrive, AlertTriangle, Trash2, Wrench } from "lucide-react";
+import { 
+  Camera, FolderOpen, RefreshCw, HardDrive, AlertTriangle, 
+  Trash2, Wrench, CheckSquare, FileDown 
+} from "lucide-react";
 import CameraUploader from "@/app/components/CameraUploader";
 import ActivityFilter from "@/app/components/ActivityFilter";
 import PhotoStack, { type Activity } from "@/app/components/PhotoStack";
@@ -32,6 +33,11 @@ export default function GalleryPage() {
   const [gdriveStorage, setGdriveStorage] = useState<StorageInfo | null>(null);
   const [tokenExpired, setTokenExpired] = useState(false);
   const [dismissToken, setDismissToken] = useState(false);
+
+  // State untuk seleksi kegiatan massal
+  const [activitySelectMode, setActivitySelectMode] = useState(false);
+  const [selectedActivityIds, setSelectedActivityIds] = useState<number[]>([]);
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
 
   const fetchActivities = useCallback(async () => {
     setLoading(true);
@@ -121,6 +127,74 @@ export default function GalleryPage() {
     setTimeout(() => setDismissToken(false), 3 * 60 * 60 * 1000);
   };
 
+  // Handler seleksi kegiatan
+  const toggleActivitySelect = (id: number) => {
+    setSelectedActivityIds(prev => 
+      prev.includes(id) ? prev.filter(itemId => itemId !== id) : [...prev, id]
+    );
+  };
+
+  const selectAllActivities = () => {
+    if (selectedActivityIds.length === filteredActivities.length) {
+      setSelectedActivityIds([]);
+    } else {
+      setSelectedActivityIds(filteredActivities.map(a => a.id));
+    }
+  };
+
+  // Handler Bulk Download
+  const handleBulkDownload = async () => {
+    if (selectedActivityIds.length === 0) return;
+    setIsBulkProcessing(true);
+    try {
+      const res = await fetch("/api/activities/bulk-download", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ activityIds: selectedActivityIds }),
+      });
+      if (!res.ok) throw new Error("Gagal download");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `backup-kegiatan-${new Date().toISOString().split("T")[0]}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setActivitySelectMode(false);
+      setSelectedActivityIds([]);
+    } catch {
+      alert("Gagal mengunduh backup.");
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
+  // Handler Bulk Delete (Soft Delete ke Trash)
+  const handleBulkDelete = async () => {
+    if (selectedActivityIds.length === 0) return;
+    if (!confirm(`Pindahkan ${selectedActivityIds.length} kegiatan ke Tempat Sampah?`)) return;
+    
+    setIsBulkProcessing(true);
+    try {
+      const res = await fetch("/api/activities/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ activityIds: selectedActivityIds }),
+      });
+      if (!res.ok) throw new Error("Gagal hapus");
+      
+      setActivitySelectMode(false);
+      setSelectedActivityIds([]);
+      handleRefresh();
+    } catch {
+      alert("Gagal memindahkan ke trash.");
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
   const filteredActivities = activities.filter((activity) => {
     if (!filters.category) return true;
     if (filters.category === "inside") {
@@ -157,6 +231,39 @@ export default function GalleryPage() {
           
           {/* Actions */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {!activitySelectMode ? (
+              <Button variant="outline" size="sm" onClick={() => setActivitySelectMode(true)} className="text-xs hidden sm:flex">
+                <CheckSquare className="h-3.5 w-3.5 mr-1" /> Pilih Kegiatan
+              </Button>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <Button variant="outline" size="sm" onClick={selectAllActivities} className="text-xs">
+                  {selectedActivityIds.length === filteredActivities.length ? "Batal Semua" : "Pilih Semua"}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleBulkDownload} 
+                  disabled={selectedActivityIds.length === 0 || isBulkProcessing}
+                  className="text-xs text-emerald-700 border-emerald-200"
+                >
+                  <FileDown className="h-3.5 w-3.5 sm:mr-1" /> <span className="hidden sm:inline">Download</span>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleBulkDelete} 
+                  disabled={selectedActivityIds.length === 0 || isBulkProcessing}
+                  className="text-xs text-red-600 border-red-200"
+                >
+                  <Trash2 className="h-3.5 w-3.5 sm:mr-1" /> <span className="hidden sm:inline">Hapus</span>
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => { setActivitySelectMode(false); setSelectedActivityIds([]); }} className="text-xs">
+                  Batal
+                </Button>
+              </div>
+            )}
+
             <a
               href="/trash"
               className="flex items-center gap-1 text-xs text-slate-500 hover:text-red-500 transition-colors bg-slate-100 hover:bg-red-50 px-2 py-1.5 rounded-full"
@@ -273,6 +380,8 @@ export default function GalleryPage() {
                   activity={activity}
                   onRefresh={handleRefresh}
                   isFirstActivity={index === 0}
+                  isSelected={selectedActivityIds.includes(activity.id)}
+                  onToggleSelect={activitySelectMode ? toggleActivitySelect : undefined}
                 />
               ))}
             </AnimatePresence>

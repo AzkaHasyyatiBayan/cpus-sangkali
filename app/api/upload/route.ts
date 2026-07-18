@@ -1,5 +1,3 @@
-// app/api/upload/route.ts
-
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { activities, photos } from "@/lib/schema";
@@ -46,22 +44,15 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(arrayBuffer);
     const fileSize = buffer.length;
 
-    // Upload ke Cloudinary
+    // 1. Upload ke Cloudinary (Utama)
     console.log("🔵 Upload ke Cloudinary...");
-    
     const driveFileId = await uploadToGoogleDrive(
       buffer,
       `${title}_${Date.now()}_${file.name}`
     );
     console.log("🔵 Cloudinary OK:", driveFileId);
 
-    // Nama file backup
-    const safeTitle = title.trim().replace(/[^a-zA-Z0-9]/g, "_");
-    const safeLocation = (location || "tanpa-lokasi").trim().replace(/[^a-zA-Z0-9]/g, "_");
-    const safeUploader = (uploader || "tanpa-pengupload").trim().replace(/[^a-zA-Z0-9]/g, "_");
-    const backupFileName = `${activityDate}_${safeTitle}_${safeLocation}_${safeUploader}_${Date.now()}`;
-
-    // Backup ke Google Drive
+    // 2. Backup ke Google Drive (Dengan Struktur Folder)
     console.log("🟡 Mulai backup ke Google Drive...");
     try {
       const { uploadBackupToGoogleDrive } = await import("@/lib/googleDrive");
@@ -72,15 +63,28 @@ export async function POST(request: NextRequest) {
         .jpeg({ quality: 85 })
         .toBuffer();
 
-      const jpgFileName = `${backupFileName}.jpg`;
+      const safeTitle = title.trim().replace(/[^a-zA-Z0-9]/g, "_");
+      const safeLocation = (location || "tanpa-lokasi").trim().replace(/[^a-zA-Z0-9]/g, "_");
+      const safeUploader = (uploader || "tanpa-pengupload").trim().replace(/[^a-zA-Z0-9]/g, "_");
+      const backupFileName = `${activityDate}_${safeTitle}_${safeLocation}_${safeUploader}_${Date.now()}.jpg`;
+
       console.log("🟡 Upload ke Drive...");
-      await uploadBackupToGoogleDrive(jpgBuffer, jpgFileName, "image/jpeg");
+      
+      await uploadBackupToGoogleDrive(
+        jpgBuffer, 
+        backupFileName, 
+        "image/jpeg", 
+        title,           // Argumen ke-4: activityTitle
+        activityDate     // Argumen ke-5: activityDate
+      );
+      
       console.log("🟢 Backup ke Google Drive berhasil (JPG)");
     } catch (e) {
       console.error("🔴 Backup ke Google Drive gagal:", e);
+      // Tidak throw error agar upload utama (Cloudinary + DB) tetap berhasil
     }
 
-    // Cari atau buat activity
+    // 3. Cari atau buat activity di database
     let [activity] = await db
       .select()
       .from(activities)
@@ -104,6 +108,7 @@ export async function POST(request: NextRequest) {
       if (location?.trim() && !activity.location) changed.location = location.trim();
       if (uploader?.trim() && !activity.uploader) changed.uploader = uploader.trim();
       if (category && !activity.category) changed.category = category.trim();
+      
       if (Object.keys(changed).length > 0) {
         [activity] = await db
           .update(activities)
@@ -113,6 +118,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // 4. Simpan data foto ke database
     const [photo] = await db
       .insert(photos)
       .values({

@@ -42,6 +42,8 @@ interface PhotoStackProps {
   activity: Activity;
   onRefresh: () => void;
   isFirstActivity?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (id: number) => void;
 }
 
 const MAX_PREVIEW = 3;
@@ -68,7 +70,7 @@ function groupByDate(dates: DateGroup[]): GroupedByDate[] {
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
-export default function PhotoStack({ activity, onRefresh, isFirstActivity }: PhotoStackProps) {
+export default function PhotoStack({ activity, onRefresh, isFirstActivity, isSelected, onToggleSelect }: PhotoStackProps) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedPhotos, setSelectedPhotos] = useState<number[]>([]);
@@ -192,11 +194,28 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity }: Pho
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="bg-white rounded-xl border border-emerald-100 shadow-sm overflow-hidden"
+        className={`bg-white rounded-xl border shadow-sm overflow-hidden transition-all ${
+          isSelected ? "border-emerald-500 ring-2 ring-emerald-500/20" : "border-emerald-100"
+        }`}
       >
         {/* Header - Responsive */}
         <div className="px-3 sm:px-4 py-2.5 sm:py-3 border-b border-emerald-50 bg-linear-to-r from-emerald-50/50 to-white">
           <div className="flex items-start justify-between gap-2 sm:gap-3">
+            
+            {/* Checkbox Seleksi Kegiatan */}
+            {onToggleSelect && (
+              <button 
+                onClick={() => onToggleSelect(activity.id)}
+                className="mt-1 shrink-0 text-emerald-600 hover:text-emerald-700"
+              >
+                {isSelected ? (
+                  <CheckSquare className="h-5 w-5 sm:h-6 sm:w-6" />
+                ) : (
+                  <Square className="h-5 w-5 sm:h-6 sm:w-6 text-slate-300" />
+                )}
+              </button>
+            )}
+
             <div className="flex-1 min-w-0">
               {/* Title + Category badge */}
               <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
@@ -211,9 +230,9 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity }: Pho
                     }`}
                   >
                     {activity.category === "inside" ? (
-                      <span className="flex items-center gap-0.5"><Building2 className="h-2.5 w-2.5" /> Dalam Gedung</span>
+                      <span className="flex items-center gap-0.5"><Building2 className="h-2.5 w-2.5" /> Dalam</span>
                     ) : (
-                      <span className="flex items-center gap-0.5"><TreePine className="h-2.5 w-2.5" /> Luar Gedung</span>
+                      <span className="flex items-center gap-0.5"><TreePine className="h-2.5 w-2.5" /> Luar</span>
                     )}
                   </Badge>
                 )}
@@ -238,7 +257,7 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity }: Pho
                           ? <MapPin className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-emerald-500 shrink-0" />
                           : <span className="inline-block w-2.5 sm:w-3 shrink-0" />
                         }
-                        <span className="truncate max-w-150px sm:max-w-none">{loc}</span>
+                        <span className="truncate max-w-37.5 sm:max-w-none">{loc}</span>
                       </span>
                     ))}
                   </div>
@@ -252,7 +271,7 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity }: Pho
                           ? <User className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-emerald-500 shrink-0" />
                           : <span className="inline-block w-2.5 sm:w-3 shrink-0" />
                         }
-                        <span className="truncate max-w-150px sm:max-w-none">{upl}</span>
+                        <span className="truncate max-w-37.5 sm:max-w-none">{upl}</span>
                       </span>
                     ))}
                   </div>
@@ -362,13 +381,13 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity }: Pho
                             {showLocation && (
                               <span className="flex items-center gap-0.5 sm:gap-1">
                                 <MapPin className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-emerald-500 shrink-0" />
-                                <span className="truncate max-w-120px sm:max-w-none">{group.location}</span>
+                                <span className="truncate max-w-30 sm:max-w-none">{group.location}</span>
                               </span>
                             )}
                             {group.uploader && (
                               <span className="flex items-center gap-0.5 sm:gap-1">
                                 <User className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-emerald-500 shrink-0" />
-                                <span className="truncate max-w-120px sm:max-w-none">{group.uploader}</span>
+                                <span className="truncate max-w-30 sm:max-w-none">{group.uploader}</span>
                               </span>
                             )}
                           </div>
