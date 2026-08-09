@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { sql } from "drizzle-orm";
 
 interface GoogleToken {
+  id: number;
   access_token: string;
   refresh_token: string | null;
   expiry_date: number | null;
@@ -12,7 +13,7 @@ type GoogleDriveClient = ReturnType<typeof google.drive>;
 
 export async function getGoogleDriveClient() {
   const result = await db.execute(sql`
-    SELECT access_token, refresh_token, expiry_date 
+    SELECT id, access_token, refresh_token, expiry_date 
     FROM google_token 
     ORDER BY created_at DESC 
     LIMIT 1
@@ -20,6 +21,9 @@ export async function getGoogleDriveClient() {
 
   const token = result.rows[0] as unknown as GoogleToken;
   if (!token) throw new Error("Token tidak ditemukan. Jalankan setup backup dulu.");
+
+  // Simpan ID token aktif di memori agar bisa dipakai di event "tokens"
+  const currentTokenId = token.id;
 
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -33,19 +37,36 @@ export async function getGoogleDriveClient() {
     expiry_date: token.expiry_date ?? undefined,
   });
 
+  // Event ini otomatis terpicu ketika googleapis merefresh access_token
+  // (karena access_token Google hanya berlaku ±1 jam).
+  // Kita update baris token yang sedang aktif berdasarkan ID, bukan string access_token lama.
   oauth2Client.on("tokens", async (newTokens) => {
-    await db.execute(sql`
-      UPDATE google_token 
-      SET access_token = ${newTokens.access_token}, 
-          expiry_date = ${newTokens.expiry_date}
-      WHERE access_token = ${token.access_token}
-    `);
+    try {
+      // Gunakan refresh_token baru jika Google mengirimkannya (jarang, tapi mungkin).
+      // Jika tidak, pertahankan refresh_token yang lama.
+      const newRefreshToken = newTokens.refresh_token ?? token.refresh_token;
+
+      await db.execute(sql`
+        UPDATE google_token 
+        SET access_token = ${newTokens.access_token}, 
+            refresh_token = ${newRefreshToken},
+            expiry_date = ${newTokens.expiry_date ?? null}
+        WHERE id = ${currentTokenId}
+      `);
+      console.log("Access token Google Drive berhasil di-refresh otomatis!");
+    } catch (err) {
+      console.error("Gagal update token Google Drive di database:", err);
+    }
   });
 
   return google.drive({ version: "v3", auth: oauth2Client });
 }
 
-async function getOrCreateFolder(drive: GoogleDriveClient, folderName: string, parentFolderId: string): Promise<string> {
+async function getOrCreateFolder(
+  drive: GoogleDriveClient,
+  folderName: string,
+  parentFolderId: string
+): Promise<string> {
   const res = await drive.files.list({
     q: `'${parentFolderId}' in parents and name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
     fields: "files(id, name)",
@@ -78,14 +99,18 @@ export async function uploadBackupToGoogleDrive(
   const { Readable } = await import("stream");
 
   const rootFolderId = process.env.GOOGLE_DRIVE_BACKUP_FOLDER_ID || "";
-  
+
   // 1. Buat/ambil folder Bulan (format: YYYY-MM)
-  const monthStr = activityDate.substring(0, 7); 
+  const monthStr = activityDate.substring(0, 7);
   const monthFolderId = await getOrCreateFolder(drive, monthStr, rootFolderId);
 
   // 2. Buat/ambil folder Nama Kegiatan
   const safeActivityTitle = activityTitle.replace(/[^a-zA-Z0-9]/g, "_");
-  const activityFolderId = await getOrCreateFolder(drive, safeActivityTitle, monthFolderId);
+  const activityFolderId = await getOrCreateFolder(
+    drive,
+    safeActivityTitle,
+    monthFolderId
+  );
 
   // 3. Upload file ke dalam folder kegiatan tersebut
   const response = await drive.files.create({
