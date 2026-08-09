@@ -43,7 +43,6 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
 
   const handleTitleChange = (newTitle: string) => {
     setTitle(newTitle);
-    // Auto-fill lokasi hanya jika lokasi masih kosong
     if (!location.trim()) {
       const suggestedLocation = getDefaultLocationForActivity(newTitle);
       if (suggestedLocation) {
@@ -52,11 +51,9 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
     }
   };
 
-  // Fetch suggestions saat modal terbuka ATAU category berubah
   useEffect(() => {
     if (!isOpen) return;
 
-    // Fetch titles dengan filter category
     const titleParams = new URLSearchParams();
     if (category) titleParams.set("category", category);
     
@@ -65,7 +62,6 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
       .then((d) => { if (d.success) setTitleSuggestions(d.data); })
       .catch(console.error);
 
-    // Fetch locations dengan filter category
     const locationParams = new URLSearchParams();
     if (category) locationParams.set("category", category);
     
@@ -112,12 +108,14 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
 
     try {
       for (let i = 0; i < files.length; i++) {
+        // Kompresi mempertahankan format asli (JPG/PNG) dari HP, tidak dipaksa ke WebP
         const compressedFile = await new Promise<File>((resolve, reject) => {
           new Compressor(files[i], {
             maxWidth: 1600,
             maxHeight: 1600,
-            quality: 0.6,
-            mimeType: "image/webp",
+            quality: 0.85,
+            mimeType: files[i].type, // Mempertahankan format asli (JPG/PNG)
+            convertSize: Infinity,   // Mencegah konversi otomatis PNG ke JPEG
             success(result) { resolve(result as File); },
             error(err) { reject(err); },
           });
@@ -199,7 +197,6 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
               transition={{ type: "spring", damping: 25 }}
               className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl overflow-hidden max-h-[95vh] sm:max-h-[90vh] flex flex-col"
             >
-              {/* Header - sticky */}
               <div className="bg-linear-to-r from-emerald-600 to-emerald-700 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between shrink-0">
                 <h2 className="text-white font-semibold text-sm sm:text-lg truncate pr-2">
                   {uploadSuccess ? "Berhasil!" : "Unggah Foto"}
@@ -211,10 +208,6 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
                 )}
               </div>
 
-              {/* Content - scrollable */}
-              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1"></div>
-
-              {/* Content - scrollable */}
               <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
                 {uploadSuccess ? (
                   <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="flex flex-col items-center py-8">
@@ -224,7 +217,6 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
                   </motion.div>
                 ) : (
                   <>
-                    {/* Kategori Lokasi */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
                         Kategori Lokasi <span className="text-red-500">*</span>
@@ -283,7 +275,6 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
                       </p>
                     </div>
 
-                    {/* Tanggal */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">
                         Tanggal Kegiatan <span className="text-red-500">*</span>
@@ -297,7 +288,6 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
                       />
                     </div>
 
-                    {/* Lokasi */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">
                         Lokasi Kegiatan <span className="text-slate-400 font-normal">(opsional)</span>
@@ -312,7 +302,6 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
                       />
                     </div>
 
-                    {/* Pengupload */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">
                         Diupload oleh <span className="text-slate-400 font-normal">(opsional)</span>
@@ -327,7 +316,6 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
                       />
                     </div>
 
-                    {/* Deskripsi */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">
                         Deskripsi Singkat <span className="text-slate-400 font-normal">(opsional)</span>
@@ -348,7 +336,6 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
                       </div>
                     </div>
 
-                    {/* Pilih Foto */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">
                         Pilih Foto <span className="text-red-500">*</span>
@@ -382,7 +369,6 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
                       <p className="text-xs text-slate-400 mt-2 text-center">JPG, PNG, WEBP • Maks 1MB per foto</p>
                     </div>
 
-                    {/* Preview */}
                     {previews.length > 0 && (
                       <div>
                         <div className="flex items-center justify-between mb-2">
@@ -408,7 +394,6 @@ export default function CameraUploader({ onUploadSuccess }: CameraUploaderProps)
                       </div>
                     )}
 
-                    {/* Progress */}
                     {isUploading && (
                       <div className="space-y-2">
                         <div className="flex items-center justify-between text-sm">

@@ -46,10 +46,17 @@ export async function getCloudinaryUsage(): Promise<{
   };
 }
 
+//  f_auto,q_auto untuk thumbnail galeri (Otomatis WebP/AVIF di browser)
 export function getThumbnailUrl(fileId: string, size: number = 400): string {
-  return `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/w_${size},c_fill/${fileId}`;
+  return `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/w_${size},c_fill,f_auto,q_auto/${fileId}`;
 }
 
+// tampilan penuh di Lightbox (Dioptimasi untuk web agar loading cepat)
+export function getOptimizedFullUrl(fileId: string): string {
+  return `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/f_auto,q_auto/${fileId}`;
+}
+
+// cetak/Word/ZIP (Kualitas asli tanpa transformasi Cloudinary)
 export function getFullImageUrl(fileId: string): string {
   return `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/${fileId}`;
 }

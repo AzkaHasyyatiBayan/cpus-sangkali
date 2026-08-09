@@ -102,6 +102,9 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity, isSel
     return 0;
   };
 
+  // Helper untuk mengubah URL Cloudinary menjadi versi optimal (WebP/AVIF) khusus Lightbox
+  const getOptimizedUrl = (url: string) => url.replace('/image/upload/', '/image/upload/f_auto,q_auto/');
+
   const toggleSelectMode = () => {
     setSelectMode(!selectMode);
     setSelectedPhotos([]);
@@ -198,11 +201,9 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity, isSel
           isSelected ? "border-emerald-500 ring-2 ring-emerald-500/20" : "border-emerald-100"
         }`}
       >
-        {/* Header - Responsive */}
         <div className="px-3 sm:px-4 py-2.5 sm:py-3 border-b border-emerald-50 bg-linear-to-r from-emerald-50/50 to-white">
           <div className="flex items-start justify-between gap-2 sm:gap-3">
             
-            {/* Checkbox Seleksi Kegiatan */}
             {onToggleSelect && (
               <button 
                 onClick={() => onToggleSelect(activity.id)}
@@ -217,7 +218,6 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity, isSel
             )}
 
             <div className="flex-1 min-w-0">
-              {/* Title + Category badge */}
               <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                 <h3 className="font-semibold text-emerald-800 text-sm sm:text-base leading-tight">{activity.title}</h3>
                 {activity.category && (
@@ -238,7 +238,6 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity, isSel
                 )}
               </div>
 
-              {/* Info line: sesi | foto | lokasi | uploader */}
               <div className="flex flex-wrap items-start gap-x-2 sm:gap-x-3 gap-y-0.5 mt-1 sm:mt-1.5 text-[11px] sm:text-xs text-slate-500">
                 <span className="flex items-center gap-0.5 sm:gap-1 shrink-0">
                   <Calendar className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-emerald-500" />
@@ -279,7 +278,6 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity, isSel
               </div>
             </div>
 
-            {/* Actions - compact di mobile */}
             <div className="flex items-center gap-1 sm:gap-2 shrink-0">
               <Badge variant="secondary" className="flex items-center gap-0.5 sm:gap-1 text-[10px] sm:text-xs px-1.5 sm:px-2 py-0">
                 <ImageIcon className="h-2.5 w-2.5 sm:h-3 sm:w-3" />{totalPhotos}
@@ -329,7 +327,6 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity, isSel
             </div>
           </div>
 
-          {/* Description */}
           {activity.description && (
             <div className="mt-2 sm:mt-3 bg-emerald-50/70 border-l-4 border-emerald-300 rounded-r-lg px-2 sm:px-3 py-1.5 sm:py-2">
               <div className="flex items-start gap-1.5 sm:gap-2">
@@ -349,7 +346,6 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity, isSel
           )}
         </div>
 
-        {/* Dates & Photos - Responsive */}
         <div className="p-3 sm:p-4 space-y-3">
           {groupedByDate.map((dateBlock) => {
             let lastLocation: string | null = null;
@@ -375,7 +371,6 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity, isSel
 
                     return (
                       <div key={`${group.date}-${group.location ?? "noloc"}-${group.uploader ?? "noupl"}-${groupIndex}`} className="space-y-1 sm:space-y-1.5">
-                        {/* Location & uploader */}
                         {(showLocation || group.uploader) && (
                           <div className="flex items-center gap-2 sm:gap-3 text-[11px] sm:text-xs text-slate-500 flex-wrap">
                             {showLocation && (
@@ -393,7 +388,6 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity, isSel
                           </div>
                         )}
 
-                        {/* Photo stack - responsive size */}
                         <div className="flex overflow-x-auto gap-2 sm:gap-3 pb-2 hide-scrollbar -mx-1 px-1">
                           {photosToShow.map((photo, photoIndex) => {
                             const isFirstPhoto = isFirstActivity && photoIndex === 0;
@@ -434,7 +428,6 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity, isSel
                             );
                           })}
 
-                          {/* Remaining photos indicator */}
                           {remaining > 0 && !selectMode && (
                             <motion.div
                               initial={{ opacity: 0, scale: 0.85 }}
@@ -480,7 +473,16 @@ export default function PhotoStack({ activity, onRefresh, isFirstActivity, isSel
           <button onClick={(e) => { e.stopPropagation(); setLightboxIndex((prev) => prev! > 0 ? prev! - 1 : allPhotos.length - 1); }} className="absolute left-2 sm:left-4 h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors z-10 text-xl sm:text-2xl">‹</button>
           <button onClick={(e) => { e.stopPropagation(); setLightboxIndex((prev) => prev! < allPhotos.length - 1 ? prev! + 1 : 0); }} className="absolute right-2 sm:right-4 h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors z-10 text-xl sm:text-2xl">›</button>
           <div className="relative max-w-full max-h-[85vh]">
-            <Image src={allPhotos[lightboxIndex].fullUrl} alt={allPhotos[lightboxIndex].fileName || "Foto"} width={1200} height={800} className="object-contain rounded-lg max-h-[85vh] w-auto h-auto" unoptimized />
+            {/* Menggunakan getOptimizedUrl agar Lightbox memuat WebP/AVIF secara otomatis dari Cloudinary */}
+            <Image 
+              src={getOptimizedUrl(allPhotos[lightboxIndex].fullUrl)} 
+              alt={allPhotos[lightboxIndex].fileName || "Foto"} 
+              width={1200} 
+              height={800} 
+              className="object-contain rounded-lg max-h-[85vh] w-auto h-auto" 
+              unoptimized 
+              loading="eager"
+            />
           </div>
           <div className="absolute bottom-2 sm:bottom-4 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur-sm rounded-full px-3 sm:px-4 py-1.5 sm:py-2 text-white text-xs sm:text-sm">{lightboxIndex + 1} / {allPhotos.length}</div>
         </motion.div>
